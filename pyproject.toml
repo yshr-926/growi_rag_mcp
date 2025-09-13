@@ -1,0 +1,36 @@
+[project]
+name = "growi-rag-mcp"
+version = "0.1.0"
+description = "Retrieval Augmented Generation MCP server for GROWI wiki integration"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
+    "chromadb>=0.4.0",
+    "langchain>=0.2.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0.0",
+    "httpx>=0.24.0",
+    "uvloop>=0.17.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "toml>=0.10.2",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "black>=23.0.0",
+    "pytest-cov>=4.0.0",
+    "pre-commit>=3.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "toml>=0.10.2",
+]
