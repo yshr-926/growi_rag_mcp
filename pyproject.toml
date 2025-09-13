@@ -12,7 +12,12 @@ dependencies = [
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
     "httpx>=0.24.0",
-    "uvloop>=0.17.0"
+    "uvloop>=0.17.0",
+    "toml>=0.10.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.13.0",
+    "mypy>=1.18.1",
 ]
 
 [project.optional-dependencies]

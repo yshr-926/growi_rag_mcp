@@ -1,0 +1,1 @@
+# GROWI RAG MCP Server package
