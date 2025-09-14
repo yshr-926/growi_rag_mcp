@@ -1,0 +1,52 @@
+# GROWI RAG MCP Server Configuration
+# ====================================
+#
+# This configuration file controls all aspects of the GROWI RAG MCP server.
+# Modify the values below to match your environment and requirements.
+
+# Server Configuration
+# --------------------
+# Basic server settings for the MCP interface
+server:
+  host: "localhost"           # Bind address for the server
+  port: 3000                  # Port number for the server
+  debug: false                # Enable debug mode (verbose logging)
+
+# Logging Configuration
+# ---------------------
+# Configure logging behavior for the application
+logging:
+  level: "INFO"                                                      # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"    # Log message format
+
+# GROWI Connection Settings
+# -------------------------
+# Configuration for connecting to your GROWI instance
+growi:
+  base_url: "https://your-growi-instance.com"    # Base URL of your GROWI instance
+  api_token: ""                                   # API token for authentication (keep secure!)
+
+# Vector Database Settings
+# ------------------------
+# Configuration for the vector database used for RAG
+vector_db:
+  type: "chromadb"                    # Database type (currently supports: chromadb)
+  persist_directory: "./data/chroma"  # Directory to store vector database files
+
+# Language Model Settings
+# -----------------------
+# Configuration for the language model provider
+llm:
+  provider: "openai"          # LLM provider (openai, anthropic, etc.)
+  model: "gpt-3.5-turbo"      # Model name to use
+  api_key: ""                 # API key for the provider (keep secure!)
+  max_tokens: 4096            # Maximum tokens per response
+  temperature: 0.7            # Creativity/randomness (0.0-1.0)
+
+# MCP Server Settings
+# -------------------
+# Model Context Protocol specific configuration
+mcp:
+  name: "growi-rag"           # Server name identifier
+  version: "0.1.0"            # Server version
+  description: "Retrieval Augmented Generation for GROWI wiki"  # Server description
