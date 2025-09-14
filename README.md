@@ -28,10 +28,22 @@
 ```mermaid
 graph TD
     A[MCP Client<br/>Claude Desktop] -->|MCP Protocol| B[growi-rag-mcp Server<br/>Port 3000]
-    B -->|REST API| C[GROWI Wiki<br/>API v3]
-    B -->|Vector DB| D[ChromaDB<br/>Persistent Storage]
-    B -->|Local Models| E[Embedding Model<br/>plamo-1b]
-    B -->|Local Models| F[LLM Model<br/>gpt-oss-20b]
+
+    %% Periodic sync for document updates
+    B -->|Periodic Sync<br/>12h intervals| C[GROWI Wiki<br/>API v3]
+    C -->|Page Updates| B
+
+    %% Data processing pipeline
+    B -->|New/Updated Content| E[Embedding Model<br/>plamo-1b]
+    E -->|Vector Embeddings| D[ChromaDB<br/>Vector Storage]
+
+    %% Query processing flow
+    A -->|Search Query| B
+    B -->|Similarity Search| D
+    D -->|Relevant Chunks| B
+    B -->|RAG Query + Context| F[LLM Model<br/>gpt-oss-20b]
+    F -->|Generated Summary| B
+    B -->|Search Results / Summary| A
 ```
 
 ## 🚀 Quick Start
