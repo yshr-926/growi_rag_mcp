@@ -27,6 +27,11 @@ from src.logging_config import get_logger
 DEFAULT_TIMEOUT_SEC = 10
 _PAGE_SIZE_MAX = 100  # per GROWI v3 spec
 
+# Retry/backoff policy (kept small for testability; do not change interface)
+RETRY_BACKOFFS: List[int] = [1, 2, 4]
+# Retryable HTTP status codes (extendable)
+RETRYABLE_STATUS_CODES: set[int] = {503}
+
 # Module-level logger to avoid recreating per instance
 _LOGGER: logging.Logger = get_logger("growi.client")
 
@@ -98,25 +103,13 @@ class GROWIClient:
 
         for idx, candidate in enumerate(attempt_paths):
             url = self._build_url(candidate)
-            start = time.perf_counter()
             try:
-                self._logger.debug("HTTP GET start", extra={"url": url})
-                resp = self._session.get(url, timeout=DEFAULT_TIMEOUT_SEC)
-            except requests.RequestException as exc:
-                duration_ms = int((time.perf_counter() - start) * 1000)
-                self._logger.error(
-                    "HTTP GET failed",
-                    extra={"url": url, "error": str(exc), "duration_ms": duration_ms},
-                )
-                last_error = GROWIAPIError(
-                    message="Failed to contact GROWI API",
-                    endpoint=url,
-                    status_code=0,
-                    details={"exception": str(exc)},
-                )
-                break  # network failure: don't try alternates
+                resp, _retry_attempts, _slept = self._request_with_retries(url)
+            except GROWIAPIError as e:
+                last_error = e
+                break
 
-            duration_ms = int((time.perf_counter() - start) * 1000)
+            duration_ms = 0  # measured inside helper; keep simple here
             status = resp.status_code
 
             # Authentication errors: convert to explicit domain exception
@@ -127,27 +120,24 @@ class GROWIClient:
                     if isinstance(payload, dict) and payload.get("error"):
                         details["error"] = payload.get("error")
                 except Exception:
-                    # Response body may be empty or not JSON; ignore
                     pass
-                self._logger.warning(
-                    "Authentication failed",
-                    extra={**details, "duration_ms": duration_ms},
-                )
+                self._logger.warning("Authentication failed", extra={**details, "duration_ms": duration_ms})
                 raise AuthenticationError(
                     message=f"Unauthorized or invalid token (HTTP {status})",
                     auth_type="bearer",
                     details=details,
                 )
 
-            # If first attempt (/api/v3) yields 404, try raw path
+            # If first attempt (/api/v3) yields 404, try raw path (no retry)
             if status == 404 and idx == 0 and len(attempt_paths) > 1:
                 self._logger.debug(
                     "v3 path not found; retrying without /api/v3",
                     extra={"first_url": url, "duration_ms": duration_ms},
                 )
+                last_error = None
                 continue
 
-            # Handle remaining non-2xx responses
+            # Other non-2xx: do not retry
             if not (200 <= status < 300):
                 self._logger.error(
                     "HTTP error response",
@@ -161,6 +151,7 @@ class GROWIClient:
                 )
                 break
 
+            # Success
             self._logger.info(
                 "HTTP GET success",
                 extra={"url": url, "status_code": status, "duration_ms": duration_ms},
@@ -173,6 +164,97 @@ class GROWIClient:
         raise GROWIAPIError(
             message="Unknown HTTP failure",
             endpoint=self._build_url(path),
+            status_code=0,
+        )
+
+    # --- Internal request helper -----------------------------------------
+    def _request_with_retries(self, url: str) -> Tuple[requests.Response, int, List[int]]:
+        """Send a GET request with exponential backoff for retryable conditions.
+
+        Retries on timeouts and HTTP status codes listed in RETRYABLE_STATUS_CODES.
+
+        Returns
+        -------
+        (response, retry_attempts, backoff_sleeps)
+            The final ``requests.Response`` (may be non-2xx), the number of retry
+            attempts performed, and the list of sleep durations applied.
+        """
+        retry_attempts = 0
+        slept: List[int] = []
+
+        # One initial try + up to len(RETRY_BACKOFFS) retries
+        for attempt in range(len(RETRY_BACKOFFS) + 1):
+            start = time.perf_counter()
+            try:
+                self._logger.debug("HTTP GET start", extra={"url": url, "attempt": attempt + 1})
+                resp = self._session.get(url, timeout=DEFAULT_TIMEOUT_SEC)
+            except (requests.Timeout, requests.ReadTimeout) as exc:
+                duration_ms = int((time.perf_counter() - start) * 1000)
+                if attempt < len(RETRY_BACKOFFS):
+                    delay = RETRY_BACKOFFS[attempt]
+                    self._logger.warning(
+                        "HTTP GET timeout — scheduling retry",
+                        extra={"url": url, "duration_ms": duration_ms, "retry_in_s": delay, "attempt": attempt + 1},
+                    )
+                    time.sleep(delay)
+                    slept.append(delay)
+                    retry_attempts += 1
+                    continue
+                # Out of retries (timeout path)
+                raise GROWIAPIError(
+                    message="Failed to contact GROWI API (timeout)",
+                    endpoint=url,
+                    status_code=0,
+                    details={"exception": str(exc), "retry_attempts": retry_attempts, "backoff_seconds": slept},
+                )
+            except requests.RequestException as exc:
+                # Other network errors are not retried per requirements
+                duration_ms = int((time.perf_counter() - start) * 1000)
+                self._logger.error(
+                    "HTTP GET failed",
+                    extra={"url": url, "error": str(exc), "duration_ms": duration_ms},
+                )
+                raise GROWIAPIError(
+                    message="Failed to contact GROWI API",
+                    endpoint=url,
+                    status_code=0,
+                    details={"exception": str(exc)},
+                )
+
+            duration_ms = int((time.perf_counter() - start) * 1000)
+            status = resp.status_code
+
+            # Retryable HTTP status codes
+            if status in RETRYABLE_STATUS_CODES:
+                if attempt < len(RETRY_BACKOFFS):
+                    delay = RETRY_BACKOFFS[attempt]
+                    self._logger.warning(
+                        "HTTP error from GROWI — scheduling retry",
+                        extra={"url": url, "status_code": status, "retry_in_s": delay, "attempt": attempt + 1},
+                    )
+                    time.sleep(delay)
+                    slept.append(delay)
+                    retry_attempts += 1
+                    continue
+                # Out of retries (HTTP error path)
+                raise GROWIAPIError(
+                    message=f"GROWI API returned {status} after retries",
+                    endpoint=url,
+                    status_code=status,
+                    details={"status_code": status, "retry_attempts": retry_attempts, "backoff_seconds": slept},
+                )
+
+            # Success or non-retryable error: return immediately
+            self._logger.debug(
+                "HTTP GET completed",
+                extra={"url": url, "status_code": status, "duration_ms": duration_ms, "attempt": attempt + 1},
+            )
+            return resp, retry_attempts, slept
+
+        # Defensive guard: should be unreachable
+        raise GROWIAPIError(
+            message="Retry loop exhausted without result",
+            endpoint=url,
             status_code=0,
         )
 
