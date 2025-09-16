@@ -43,6 +43,53 @@ Claude Code は本ドキュメントを基に、Codex と連携しながら開�
 - Codex 出力をレビューし、要修正か LGTM を判定せよ
 - 不合格なら修正点を列挙して返し、合格なら state を更新せよ
 
+#### 1. Red Phase（テスト失敗）
+```bash
+codex exec "
+goal: [goal]
+acceptance_criteria: [criteria]
+constraints: [constraints]
+phase: red
+
+Task: 指定された受入条件を満たすテストコードを作成してください。
+- テストは必ず失敗する状態で作成
+- pytest形式で作成
+- 既存のテストパターンに従う
+- テスト実行により失敗を確認
+"
+```
+
+#### 2. Green Phase（最小実装）
+```bash
+codex exec "
+goal: [goal]
+acceptance_criteria: [criteria]
+constraints: [constraints]
+phase: green
+
+Task: Red Phaseで作成したテストを通すための最小限の実装を行ってください。
+- テストを通すためだけの最小限のコード
+- 既存のアーキテクチャに従う
+- パフォーマンスや美しさよりもテストを通すことを優先
+"
+```
+
+#### 3. Refactor Phase（リファクタリング）
+```bash
+codex exec "
+goal: [goal]
+acceptance_criteria: [criteria]
+constraints: [constraints]
+phase: refactor
+
+Task: テストを通したままコードの品質を向上させてください。
+- テストが引き続き通ることを確認
+- コードの可読性、保守性を向上
+- 重複除去、命名改善、構造最適化
+- 外部インターフェースを変更しない
+"
+```
+
 ### `flow-run`
 
 - マイルストーンまたはフェーズ単位で `flow-next` を繰り返し実行せよ
