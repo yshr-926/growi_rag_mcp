@@ -38,6 +38,7 @@ _METADATA_FIELDS = (
     "page_title",
     "url",
     "updated_at",
+    "text",
 )
 
 

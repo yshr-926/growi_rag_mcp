@@ -1,78 +1,120 @@
-"""MCP tools implementation (minimal for tests).
+"""MCP tools implementation with vector search integration.
 
-This module provides a tiny implementation of the `growi_retrieve` tool used by
-the integration and E2E tests. The behavior is intentionally simple and aims to
-return a stable, schema-conformant structure without performing heavy RAG work.
+This module provides production implementation of the `growi_retrieve` tool
+that performs semantic search using vector embeddings stored in ChromaDB.
 
 Contracts satisfied:
 - tools: `handle_growi_retrieve(query: str, top_k: int = 5, min_relevance: float = 0.5, **kwargs) -> dict`
 - result shape (spec §7.1): {"results": [...], "total_chunks_found": int}
 
 Notes:
-- Only public pages (grant == 1) are included in results.
-- URL format is stable but simplified: `<base_url>/page/<page_id>`.
+- Uses PlamoEmbeddingModel for query embedding generation
+- Performs similarity search against ChromaDB vector store
+- Returns semantically relevant chunks with similarity scores
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List
 
 from src.config import ConfigManager
-from src.growi_client import GROWIClient
+from src.embedding_model import PlamoEmbeddingModel
+from src.vector_store import ChromaVectorStore
+
+logger = logging.getLogger(__name__)
 
 
-def _to_result_item(base_url: str, page: Dict[str, Any], index: int) -> Dict[str, Any]:
-    page_id = str(page.get("_id", f"unknown-{index}"))
-    title = str(page.get("title", ""))
-    body = str(((page.get("revision") or {}).get("body")) or "")
-    tags = list(page.get("tags") or [])
-    updated_at = str(page.get("updatedAt", ""))
+def _format_search_result(item: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+    """Convert ChromaDB search result to MCP tool response format."""
+    import json
+
+    metadata = item.get("metadata", {})
+
+    # Extract page_id from chunk_id (format: "page_id#chunk_index")
+    chunk_id = item.get("id", "")
+    page_id = chunk_id.split("#")[0] if "#" in chunk_id else chunk_id
+
+    # Deserialize JSON metadata values back to their original types
+    def _deserialize_value(value: Any) -> Any:
+        if isinstance(value, str):
+            try:
+                # Try to parse as JSON for list/dict values
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                # Return as-is if not valid JSON
+                return value
+        return value
 
     return {
-        "chunk_id": f"{page_id}#0",
-        "score": 1.0,  # Minimal deterministic score for tests
-        "chunk_text": body,
-        "page_title": title,
+        "chunk_id": chunk_id,
+        "score": float(item.get("score", 0.0)),
+        "chunk_text": item.get("document", ""),
+        "page_title": metadata.get("page_title", ""),
         "url": f"{base_url}/page/{page_id}",
-        "headings_path": [],  # Keeping minimal; tests only check type
-        "tags": tags,
-        "updated_at": updated_at,
+        "headings_path": _deserialize_value(metadata.get("headings_path", [])),
+        "tags": _deserialize_value(metadata.get("tags", [])),
+        "updated_at": metadata.get("updated_at", ""),
     }
 
 
 def handle_growi_retrieve(
     query: str,
     top_k: int = 5,
-    min_relevance: float = 0.5,  # noqa: ARG001 - not used in minimal impl
+    min_relevance: float = 0.5,
     **_: Any,
 ) -> Dict[str, Any]:
-    """Retrieve public page chunks matching a query (minimal implementation).
+    """Retrieve page chunks matching a query using vector similarity search.
 
-    The current implementation ignores the query semantics and returns up to
-    ``top_k`` public pages from the source, transformed into the expected
-    result item shape. This is sufficient for the E2E tests which validate
-    filtering and structure rather than ranking quality.
+    Embeds the query using PlamoEmbeddingModel and searches ChromaDB for
+    semantically similar content chunks with configurable relevance thresholds.
     """
-    # Load configuration (base URL and token)
+    # Load configuration
     cfg = ConfigManager().load_config("config.yaml")
     base_url = cfg.growi.base_url
-    token = cfg.growi.api_token or ""
 
-    # Fetch pages via client (tests may monkeypatch the client)
-    client = GROWIClient(base_url=base_url, token=token)
-    pages: List[Dict[str, Any]] = client.fetch_pages(limit=max(int(top_k), 1))
+    # Initialize embedding model and vector store
+    model = PlamoEmbeddingModel(model_path="./models/plamo-embedding-1b", device="auto")
+    model.load()
 
-    # Filter only public pages (grant == 1)
-    public_pages = [p for p in pages if int(p.get("grant", 0)) == 1]
+    vector_store = ChromaVectorStore(
+        persist_directory="./data/chroma",
+        collection_name="growi_chunks",
+        distance="cosine"
+    )
 
-    # Build results; limit to top_k deterministically by input order
-    items = [_to_result_item(base_url, p, i) for i, p in enumerate(public_pages)]
-    limited = items[: max(int(top_k), 1)]
+    try:
+        # Generate query embedding
+        logger.info("Generating embedding for query: %s", query[:50])
+        query_embedding = model.embed(query)
 
-    return {
-        "results": limited,
-        "total_chunks_found": len(items),
-    }
+        # Search vector store
+        logger.info("Searching vector store with top_k=%d, min_relevance=%.2f", top_k, min_relevance)
+        search_results = vector_store.search_by_embedding(
+            query_embedding,
+            top_k=top_k,
+            min_relevance=min_relevance
+        )
+
+        # Format results for MCP response
+        formatted_results = [
+            _format_search_result(item, base_url)
+            for item in search_results
+        ]
+
+        logger.info("Found %d relevant chunks", len(formatted_results))
+        return {
+            "results": formatted_results,
+            "total_chunks_found": len(formatted_results),
+        }
+
+    except Exception as e:
+        logger.error("Error during vector search: %s", e)
+        # Fallback to empty results on error
+        return {
+            "results": [],
+            "total_chunks_found": 0,
+        }
 
 
 # Optional placeholder for future RAG tool; not required by current tests.
