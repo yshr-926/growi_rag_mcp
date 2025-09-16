@@ -14,7 +14,7 @@ Notes
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 import logging
 import time
@@ -25,6 +25,7 @@ from src.exceptions import AuthenticationError, GROWIAPIError
 from src.logging_config import get_logger
 
 DEFAULT_TIMEOUT_SEC = 10
+_PAGE_SIZE_MAX = 100  # per GROWI v3 spec
 
 # Module-level logger to avoid recreating per instance
 _LOGGER: logging.Logger = get_logger("growi.client")
@@ -174,3 +175,117 @@ class GROWIClient:
             endpoint=self._build_url(path),
             status_code=0,
         )
+
+    # --- Pages API helpers -------------------------------------------------
+    def fetch_pages(self, limit: int = 1000) -> List[Dict[str, Any]]:
+        """Fetch public GROWI pages with client-side pagination.
+
+        Retrieves pages from `/api/v3/pages` in batches (max 100 per request),
+        filters to public pages (`grant == 1`), and normalizes objects to a
+        compact structure expected by higher layers and tests.
+
+        Parameters
+        ----------
+        limit:
+            Maximum number of public pages to return (default: 1000 during dev).
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Normalized page objects with keys: `id`, `title`, `path`, `body`,
+            and `revision` (containing `id`, `updatedAt`). A `grant` field is
+            included (== 1) for clarity but may be omitted by callers.
+        """
+        if limit <= 0:
+            return []
+
+        results: List[Dict[str, Any]] = []
+        offset = 0
+
+        self._logger.debug(
+            "Begin fetch_pages",
+            extra={"limit": limit, "page_size_max": _PAGE_SIZE_MAX},
+        )
+
+        while len(results) < limit:
+            remaining = limit - len(results)
+            req_limit = min(_PAGE_SIZE_MAX, max(1, remaining))
+
+            path = self._build_pages_path(req_limit, offset)
+            data = self.get(path)
+
+            if not isinstance(data, dict):
+                raise GROWIAPIError(
+                    message="Invalid response payload from GROWI API",
+                    endpoint=self._build_url("/api/v3/pages"),
+                    status_code=0,
+                )
+
+            batch = data.get("pages") or []
+            added = 0
+            for raw in batch:
+                if not self._is_public_page(raw):
+                    continue
+                results.append(self._normalize_page(raw))
+                added += 1
+                if len(results) >= limit:
+                    break
+
+            offset, has_next = self._advance_pagination(data, offset, req_limit)
+            self._logger.debug(
+                "Fetched page batch",
+                extra={
+                    "offset": offset,
+                    "req_limit": req_limit,
+                    "batch_size": len(batch),
+                    "added_public": added,
+                    "total_collected": len(results),
+                    "has_next": has_next,
+                },
+            )
+
+            if not has_next:
+                break
+
+        self._logger.info(
+            "Completed fetch_pages",
+            extra={"returned": len(results), "requested_limit": limit},
+        )
+        return results
+
+    # --- Internal helpers (do not change external interface) --------------
+    def _build_pages_path(self, limit: int, offset: int) -> str:
+        """Build query path for pages endpoint with standard expansion."""
+        # Ask server for revision expansion when available; harmless if ignored
+        return f"/pages?limit={limit}&offset={offset}&expand=revision"
+
+    def _is_public_page(self, page: Dict[str, Any]) -> bool:
+        """Return True if the page is public (grant == 1)."""
+        return page.get("grant") == 1
+
+    def _normalize_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize raw GROWI page dict into compact structure used by callers."""
+        rev = page.get("revision") or {}
+        return {
+            "id": page.get("_id") or page.get("id"),
+            "title": page.get("title"),
+            "path": page.get("path"),
+            "body": page.get("body"),
+            "revision": {
+                "id": rev.get("_id") or rev.get("id"),
+                "updatedAt": rev.get("updatedAt"),
+            },
+            # Keep grant in output for clarity; tests accept its presence (== 1)
+            "grant": page.get("grant"),
+        }
+
+    def _advance_pagination(self, data: Dict[str, Any], offset: int, fallback_step: int) -> Tuple[int, bool]:
+        """Compute next offset and hasNext flag from API response meta.
+
+        Falls back to `fallback_step` when meta info is missing or invalid.
+        """
+        meta = data.get("meta") or {}
+        has_next = bool(meta.get("hasNext"))
+        meta_limit = meta.get("limit")
+        step = meta_limit if isinstance(meta_limit, int) and meta_limit > 0 else fallback_step
+        return offset + step, has_next
