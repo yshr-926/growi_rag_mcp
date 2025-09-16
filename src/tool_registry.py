@@ -198,3 +198,18 @@ class ToolRouter:
             min_relevance=normalized.min_relevance,
             **extras,
         )
+
+
+# -- Default Handler Bindings ------------------------------------------------------
+
+# Bind default handlers from tools module for production use
+try:
+    from .mcp import tools
+    handle_growi_retrieve = tools.handle_growi_retrieve
+    handle_growi_rag_search = tools.handle_growi_rag_search
+except ImportError:  # pragma: no cover - fallback for missing tools
+    def handle_growi_retrieve(*args, **kwargs):  # type: ignore[misc]
+        raise NotImplementedError("growi_retrieve handler not available")
+
+    def handle_growi_rag_search(*args, **kwargs):  # type: ignore[misc]
+        raise NotImplementedError("growi_rag_search handler not available")

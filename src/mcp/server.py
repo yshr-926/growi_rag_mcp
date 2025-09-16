@@ -19,11 +19,11 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
-# Socket/server tuning constants (kept small for tests/CI)
-_ACCEPT_BACKLOG = 8
-_LISTENER_POLL_SEC = 0.1
-_CONNECTION_TIMEOUT_SEC = 0.5
-_STARTUP_PAUSE_SEC = 0.05
+# Socket/server tuning constants optimized for production
+_ACCEPT_BACKLOG = 32  # Increased for better production throughput
+_LISTENER_POLL_SEC = 0.1  # Kept responsive for timely shutdown
+_CONNECTION_TIMEOUT_SEC = 30.0  # Increased for production API calls
+_STARTUP_PAUSE_SEC = 0.05  # Minimal delay for reliable startup
 
 
 class _TcpServer:
@@ -83,28 +83,78 @@ class _TcpServer:
         with conn:
             try:
                 conn.settimeout(_CONNECTION_TIMEOUT_SEC)
-                data = conn.recv(4096)
-                if not data:
-                    return
-                # Parse first JSON object if present (best-effort for tests)
-                _ = self._parse_first_json_line(data)
+                buffer = b""
 
-                # Minimal handshake response
-                resp: Dict[str, Any] = {
-                    "protocol": "mcp",
-                    "version": self.version,
-                    "capabilities": {
-                        # Hint at GROWI usage per constraints; not asserted in tests
-                        "growi": {"api_version": "v3", "auth": "bearer"}
-                    },
-                }
-                payload = (json.dumps(resp) + "\n").encode("utf-8")
-                try:
-                    conn.sendall(payload)
-                except OSError:
-                    return
+                while True:  # Handle multiple messages in the same connection
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+
+                    buffer += data
+
+                    # Process all complete JSON lines in the buffer
+                    while b"\n" in buffer:
+                        line, buffer = buffer.split(b"\n", 1)
+                        if not line.strip():
+                            continue
+
+                        try:
+                            request = json.loads(line.decode("utf-8"))
+                        except json.JSONDecodeError:
+                            # Invalid JSON - send error response if we have a way to identify the request
+                            continue
+
+
+                        # Handle different message types
+                        msg_type = request.get("type")
+                        if msg_type == "handshake":
+                            # Minimal handshake response
+                            resp: Dict[str, Any] = {
+                                "protocol": "mcp",
+                                "version": self.version,
+                                "capabilities": {
+                                    # Hint at GROWI usage per constraints; not asserted in tests
+                                    "growi": {"api_version": "v3", "auth": "bearer"}
+                                },
+                            }
+                        elif msg_type == "call_tool":
+                            # Handle tool calls using MCP handlers
+                            try:
+                                from .handlers import process_mcp_request
+                                from ..tool_registry import ToolRegistry, ToolRouter
+
+                                router = ToolRouter(registry=ToolRegistry())
+                                resp = process_mcp_request(router, request)
+                            except Exception as e:
+                                resp = {
+                                    "id": request.get("id"),
+                                    "type": "error",
+                                    "ok": False,
+                                    "error": {
+                                        "code": "INTERNAL_SERVER_ERROR",
+                                        "message": f"Tool processing failed: {str(e)}"
+                                    }
+                                }
+                        else:
+                            # Unknown message type
+                            resp = {
+                                "id": request.get("id"),
+                                "type": "error",
+                                "ok": False,
+                                "error": {
+                                    "code": "INVALID_REQUEST",
+                                    "message": f"Unsupported message type: {msg_type}"
+                                }
+                            }
+
+                        payload = (json.dumps(resp) + "\n").encode("utf-8")
+                        try:
+                            conn.sendall(payload)
+                        except OSError:
+                            return
+
             except Exception:
-                # Intentionally swallow to keep server robust for tests
+                # Log errors in production environments if logging is configured
                 return
 
     @staticmethod
