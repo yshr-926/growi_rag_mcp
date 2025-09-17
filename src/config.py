@@ -16,6 +16,11 @@ Environment variable overrides:
     - LLM_MODEL: Overrides llm.model
     - LLM_MAX_TOKENS: Overrides llm.max_tokens
     - VECTOR_DB_PERSIST_DIR: Overrides vector_db.persist_directory
+
+New T024 hierarchical structure support:
+    - models.embedding: Configuration for text embedding model
+    - models.summarizer: Configuration for text summarization model
+    - models.embedding.chunk: Text chunking parameters
 """
 
 import logging
@@ -29,8 +34,17 @@ from pydantic import BaseModel, ConfigDict, Field
 # Constants for validation and defaults
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 3000
+
+# Model configuration constants
+DEFAULT_EMBEDDING_MODEL = "pfnet/plamo-embedding-1b"
+DEFAULT_SUMMARIZER_MODEL_PATH = "/models/gpt-oss-20b"
+DEFAULT_CHUNK_SIZE = 800
+DEFAULT_CHUNK_OVERLAP = 200
+DEFAULT_DEVICE = "auto"
+DEFAULT_LLM_TEMPERATURE = 0.7
+DEFAULT_SUMMARIZER_TEMPERATURE = 0.2
+DEFAULT_MAX_NEW_TOKENS = 512
 DEFAULT_MAX_TOKENS = 4096
-DEFAULT_TEMPERATURE = 0.7
 
 # Logger instance
 logger = logging.getLogger(__name__)
@@ -85,12 +99,18 @@ class GrowiConfig(BaseModel):
     Attributes:
         base_url (str): The base URL of the GROWI instance (required).
                        Should be a valid HTTP/HTTPS URL.
+        api_url (str): Alias for base_url for backward compatibility.
         api_token (str): API token for authenticating with GROWI.
                         Can be empty initially but required for actual usage.
                         Keep this secure and never log it.
     """
     base_url: str = Field(description="Base URL of the GROWI instance")
     api_token: str = Field(default="", description="API token for GROWI authentication")
+
+    @property
+    def api_url(self) -> str:
+        """Provide api_url as an alias for base_url for backward compatibility."""
+        return self.base_url
 
 
 class VectorDbConfig(BaseModel):
@@ -142,7 +162,7 @@ class LlmConfig(BaseModel):
         gt=0
     )
     temperature: float = Field(
-        default=DEFAULT_TEMPERATURE,
+        default=DEFAULT_LLM_TEMPERATURE,
         description="Response creativity factor (0.0-2.0)",
         ge=0.0,
         le=2.0
@@ -171,6 +191,66 @@ class McpConfig(BaseModel):
     )
 
 
+class ChunkConfig(BaseModel):
+    """Text chunking configuration for embedding models.
+
+    Configuration for how text is split into chunks for embedding.
+
+    Attributes:
+        size (int): Maximum size of each text chunk in tokens. Defaults to 800.
+        overlap (int): Number of tokens to overlap between consecutive chunks. Defaults to 200.
+    """
+    size: int = Field(default=DEFAULT_CHUNK_SIZE, description="Text chunk size in tokens", ge=100, le=2000)
+    overlap: int = Field(default=DEFAULT_CHUNK_OVERLAP, description="Overlap between chunks in tokens", ge=0)
+
+
+class EmbeddingConfig(BaseModel):
+    """Embedding model configuration section.
+
+    Configuration for the text embedding model used for vector search.
+
+    Attributes:
+        name (str): Name/identifier of the embedding model.
+                   Defaults to 'pfnet/plamo-embedding-1b'.
+        device (str): Device selection for model execution. Defaults to 'auto'.
+        chunk (ChunkConfig): Text chunking configuration.
+    """
+    name: str = Field(default=DEFAULT_EMBEDDING_MODEL, description="Embedding model name")
+    device: str = Field(default=DEFAULT_DEVICE, description="Device selection (auto, cpu, cuda:0, etc.)")
+    chunk: ChunkConfig = Field(default_factory=ChunkConfig)
+
+
+class SummarizerConfig(BaseModel):
+    """Summarization model configuration section.
+
+    Configuration for the LLM used for text summarization.
+
+    Attributes:
+        model_path (str): Local path to the summarization model.
+                         Defaults to '/models/gpt-oss-20b'.
+        temperature (float): Generation temperature for creativity/randomness. Defaults to 0.2.
+        max_new_tokens (int): Maximum number of tokens to generate. Defaults to 512.
+        device (str): Device selection for model execution. Defaults to 'auto'.
+    """
+    model_path: str = Field(default=DEFAULT_SUMMARIZER_MODEL_PATH, description="Path to local summarization model")
+    temperature: float = Field(default=DEFAULT_SUMMARIZER_TEMPERATURE, description="Generation temperature", ge=0.0, le=2.0)
+    max_new_tokens: int = Field(default=DEFAULT_MAX_NEW_TOKENS, description="Maximum tokens to generate", ge=1, le=4096)
+    device: str = Field(default=DEFAULT_DEVICE, description="Device selection")
+
+
+class ModelsConfig(BaseModel):
+    """AI models configuration section.
+
+    Configuration for embedding and summarization models used by the RAG system.
+
+    Attributes:
+        embedding (EmbeddingConfig): Embedding model configuration.
+        summarizer (SummarizerConfig): Summarization model configuration.
+    """
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    summarizer: SummarizerConfig = Field(default_factory=SummarizerConfig)
+
+
 class Config(BaseModel):
     """Main configuration container.
 
@@ -184,6 +264,7 @@ class Config(BaseModel):
         vector_db (VectorDbConfig): Vector database configuration
         llm (LlmConfig): Language model provider configuration
         mcp (McpConfig): MCP protocol server metadata
+        models (ModelsConfig): AI models configuration for embedding and summarization
 
     Example:
         >>> config = Config(growi={"base_url": "https://wiki.example.com"})
@@ -197,6 +278,7 @@ class Config(BaseModel):
     vector_db: VectorDbConfig = Field(default_factory=VectorDbConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)
+    models: ModelsConfig = Field(default_factory=ModelsConfig)
 
 
 class ConfigManager:
