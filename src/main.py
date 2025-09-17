@@ -11,7 +11,11 @@ wiki instances through the Model Context Protocol (MCP) interface.
 
 import argparse
 import sys
+import time
 from typing import List, Optional
+
+from src.config import ConfigManager
+from src.mcp.server import start_tcp_server
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -61,8 +65,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("Verbose mode enabled")
         print(f"Python version: {sys.version}")
 
-    # TODO: Initialize and start the MCP server
-    # This will be implemented in future iterations
+    # Initialize configuration and start the minimal MCP TCP server
+    cfg = ConfigManager().load_config(args.config)
+    server = start_tcp_server(cfg.server.host, cfg.server.port, cfg.mcp.version)
+
+    # Keep process alive so tests can connect; exit on signal/keyboard interrupt
+    try:
+        while True:
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            server.stop()
+        except Exception:
+            pass
 
     return 0
 
