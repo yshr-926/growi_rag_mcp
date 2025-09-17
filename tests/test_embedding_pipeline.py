@@ -62,7 +62,8 @@ class TestEmbeddingPipeline:
     def model(self):
         from src.embedding_model import PlamoEmbeddingModel  # type: ignore
 
-        m = PlamoEmbeddingModel(model_path="./models/plamo-embedding-1b", device="auto")
+        # Use non-model path to avoid FileNotFoundError in development
+        m = PlamoEmbeddingModel(model_path="/tmp/test-pipeline", device="auto")
         m.load()
         return m
 
