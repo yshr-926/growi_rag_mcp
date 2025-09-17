@@ -1,7 +1,7 @@
 import json
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler
 import socketserver
 from typing import List, Dict
@@ -23,6 +23,8 @@ class Page:
     grant: int
     revision_id: str
     updated_at: str
+    tags: List[str] = field(default_factory=list)
+    created_user: Dict[str, str] = field(default_factory=dict)
 
     def to_api(self) -> Dict:
         return {
@@ -32,6 +34,8 @@ class Page:
             "body": self.body,
             "grant": self.grant,
             "revision": {"_id": self.revision_id, "updatedAt": self.updated_at},
+            "tags": self.tags,
+            "createdUser": self.created_user,
         }
 
 
@@ -48,6 +52,12 @@ def _build_dataset(total: int = 230) -> List[Page]:
                 grant=grant,
                 revision_id=f"rev-{i}",
                 updated_at=f"2025-01-01T00:{i%60:02d}:00.000Z",
+                tags=[f"tag-{i%5}", "shared"],
+                created_user={
+                    "_id": f"user-{i%3}",
+                    "username": f"user{i%3}",
+                    "name": f"User {i%3}",
+                },
             )
         )
     return dataset
@@ -86,6 +96,8 @@ def _make_pagination_handler(expected_token: str, dataset: List[Page], recorder:
                     offset = 0
                 req_limit = max(1, min(req_limit, 100))
                 offset = max(0, offset)
+
+                recorder.setdefault("expand_history", []).append(q.get("expand", []))
 
                 # Slice dataset according to offset/limit
                 end = min(len(dataset), offset + req_limit)
@@ -186,3 +198,33 @@ class TestGROWIPagesPagination:
         assert set(["id", "updatedAt"]).issubset(sample["revision"].keys())
         # No non-public pages should be included
         assert all("grant" not in p or p.get("grant") == 1 for p in pages)
+
+    def test_fetch_pages_requests_tag_and_created_user_expansion(self, pagination_test_server):
+        base_url, recorder, expected_token, _dataset = pagination_test_server
+
+        from src.growi_client import GROWIClient  # noqa: WPS433
+
+        client = GROWIClient(base_url=base_url, token=expected_token)
+        client.fetch_pages(limit=15)
+
+        expand_history = recorder.get("expand_history")
+        assert expand_history, "Client should record at least one expand parameter usage"
+        for expand_values in expand_history:
+            assert expand_values == ["tag,createdUser"]
+
+    def test_fetch_pages_returns_tags_and_created_user_fields(self, pagination_test_server):
+        base_url, _recorder, expected_token, _dataset = pagination_test_server
+
+        from src.growi_client import GROWIClient  # noqa: WPS433
+
+        client = GROWIClient(base_url=base_url, token=expected_token)
+        pages = client.fetch_pages(limit=10)
+
+        assert pages, "Expected pages for verification"
+        for page in pages[:3]:
+            assert "tags" in page
+            assert isinstance(page["tags"], list)
+            assert page["tags"], "Tag list should not be empty"
+            assert "createdUser" in page
+            assert isinstance(page["createdUser"], dict)
+            assert page["createdUser"].get("_id"), "createdUser should expose an identifier"

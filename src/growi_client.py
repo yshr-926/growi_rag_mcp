@@ -26,6 +26,7 @@ from src.logging_config import get_logger
 
 DEFAULT_TIMEOUT_SEC = 10
 _PAGE_SIZE_MAX = 100  # per GROWI v3 spec
+_DEFAULT_EXPAND_PARAMS = "tag,createdUser"  # T023: include tags and created user metadata
 
 # Retry/backoff policy (kept small for testability; do not change interface)
 RETRY_BACKOFFS: List[int] = [1, 2, 4]
@@ -338,8 +339,8 @@ class GROWIClient:
     # --- Internal helpers (do not change external interface) --------------
     def _build_pages_path(self, limit: int, offset: int) -> str:
         """Build query path for pages endpoint with standard expansion."""
-        # Ask server for revision expansion when available; harmless if ignored
-        return f"/pages?limit={limit}&offset={offset}&expand=revision"
+        # Request tag and created user expansions so downstream callers can use extra metadata
+        return f"/pages?limit={limit}&offset={offset}&expand={_DEFAULT_EXPAND_PARAMS}"
 
     def _is_public_page(self, page: Dict[str, Any]) -> bool:
         """Return True if the page is public (grant == 1)."""
@@ -348,6 +349,8 @@ class GROWIClient:
     def _normalize_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize raw GROWI page dict into compact structure used by callers."""
         rev = page.get("revision") or {}
+        tags = page.get("tags")
+        created_user = page.get("createdUser")
         return {
             "id": page.get("_id") or page.get("id"),
             "title": page.get("title"),
@@ -359,6 +362,8 @@ class GROWIClient:
             },
             # Keep grant in output for clarity; tests accept its presence (== 1)
             "grant": page.get("grant"),
+            "tags": tags if isinstance(tags, list) else [],
+            "createdUser": created_user if isinstance(created_user, dict) else {},
         }
 
     def _advance_pagination(self, data: Dict[str, Any], offset: int, fallback_step: int) -> Tuple[int, bool]:
