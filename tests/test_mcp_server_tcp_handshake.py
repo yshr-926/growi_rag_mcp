@@ -2,7 +2,7 @@
 MCP TCP server and handshake tests (Red phase).
 
 These tests define acceptance criteria for the MCP server foundation:
-  - TCP server listens on port 3000 and accepts connections
+  - TCP server listens on port 3001 and accepts connections
   - Handshake responds with protocol version and capabilities
 
 Following TDD, these tests are expected to fail initially until
@@ -26,8 +26,8 @@ from src.config import ConfigManager
 class TestMCPTcpServer:
     """Tests for MCP TCP server startup and connectivity."""
 
-    def test_tcp_server_listens_on_port_3000_and_accepts_connections(self):
-        """Server should run and accept TCP connections on port 3000.
+    def test_tcp_server_listens_on_port_3001_and_accepts_connections(self):
+        """Server should run and accept TCP connections on port 3001.
 
         Red expectation: Fails because main entry doesn't start a TCP server yet.
         """
@@ -50,7 +50,7 @@ class TestMCPTcpServer:
             # Act: attempt to connect to the expected TCP port
             connected = False
             try:
-                with socket.create_connection(("127.0.0.1", 3000), timeout=0.3):
+                with socket.create_connection(("127.0.0.1", 3001), timeout=0.3):
                     connected = True
             except OSError:
                 connected = False
@@ -60,7 +60,7 @@ class TestMCPTcpServer:
 
             # Assert: expected to fail until server is implemented
             assert is_running, "Server process should remain running after start (not exit immediately)."
-            assert connected is True, "TCP server should accept connections on port 3000."
+            assert connected is True, "TCP server should accept connections on port 3001."
 
         finally:
             # Cleanup: ensure process is terminated
@@ -86,7 +86,7 @@ class TestMCPHandshake:
         keep tests fast and non-blocking during the Red phase.
         """
         try:
-            with socket.create_connection(("127.0.0.1", 3000), timeout=0.3) as s:
+            with socket.create_connection(("127.0.0.1", 3001), timeout=0.3) as s:
                 s.settimeout(0.3)
 
                 # Minimal speculative handshake request (line-delimited JSON)

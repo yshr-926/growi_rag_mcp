@@ -21,7 +21,7 @@ class MCPTestClient:
     - Uses configurable timeouts for different test environments.
     """
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 3000, timeout: float = 5.0) -> None:
+    def __init__(self, host: str = "127.0.0.1", port: int = 3001, timeout: float = 5.0) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -132,7 +132,7 @@ def stub_growi_client(monkeypatch: pytest.MonkeyPatch, mock_growi_pages: List[Di
 
 @pytest.fixture
 def server_process() -> subprocess.Popen[str]:
-    """Launch the main entry which should start the TCP MCP server on port 3000."""
+    """Launch the main entry which should start the TCP MCP server on port 3001."""
     project_root = Path(__file__).parent.parent
     proc = subprocess.Popen(
         [sys.executable, "-m", "src.main", "--config", str(project_root / "config.yaml")],

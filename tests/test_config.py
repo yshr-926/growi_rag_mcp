@@ -49,7 +49,7 @@ class TestConfigManager:
         # Verify GROWI config structure
         assert hasattr(config.growi, 'base_url')
         assert hasattr(config.growi, 'api_token')
-        assert config.growi.base_url == "https://your-growi-instance.com"
+        assert config.growi.base_url == "http://localhost:3000"
 
     def test_vector_db_configuration_loaded_correctly(self):
         """Test that vector database configuration is loaded correctly."""
@@ -67,9 +67,9 @@ class TestConfigManager:
 
         # Verify LLM config
         assert config.llm.provider == "openai"
-        assert config.llm.model == "gpt-3.5-turbo"
+        assert config.llm.model == "gpt-4"
         assert config.llm.max_tokens == 4096
-        assert config.llm.temperature == 0.7
+        assert config.llm.temperature == 0.2
 
     def test_mcp_configuration_loaded_correctly(self):
         """Test that MCP configuration is loaded correctly."""

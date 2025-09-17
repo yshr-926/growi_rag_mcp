@@ -7,7 +7,7 @@ Acceptance criteria:
 
 Constraints:
 - Python 3.11+ with uv package management
-- TCP server on port 3000 for MCP protocol (docs/spec.md#9-サーバ／設定)
+- TCP server on port 3001 for MCP protocol (docs/spec.md#9-サーバ／設定)
 - TDD strictly enforced (Red → Green → Refactor)
 
 Spec references:
@@ -54,7 +54,8 @@ class TestMCPClientIntegration:
             print(f"Server return code: {server_process.returncode}")
             pytest.fail("Server process terminated unexpectedly")
 
-        client = mcp_client
+        # Use extended timeout for tool calls that load embedding models
+        client = MCPTestClient(timeout=30.0)
         client.connect()
         try:
             handshake_resp = client.handshake()
