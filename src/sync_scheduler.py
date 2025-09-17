@@ -20,15 +20,20 @@ from typing import Any, Dict, Iterable, List, Optional, Protocol
 
 from src.logging_config import get_logger
 
+# Default configuration constants
+DEFAULT_SYNC_INTERVAL_HOURS = 12
+DEFAULT_PAGE_LIMIT = 1000  # Development phase limit
+PUBLIC_PAGE_GRANT_VALUE = 1
+
 
 class _Client(Protocol):
     """Client protocol for fetching pages from GROWI.
 
     Required:
-        - fetch_pages(limit=int) -> List[Dict[str, Any]]
+        - fetch_pages(limit=int, updated_since=datetime|None) -> List[Dict[str, Any]]
     """
 
-    def fetch_pages(self, *, limit: int) -> List[Dict[str, Any]]:  # pragma: no cover - interface
+    def fetch_pages(self, *, limit: int, updated_since: datetime | None = None) -> List[Dict[str, Any]]:  # pragma: no cover - interface
         ...
 
 
@@ -67,6 +72,7 @@ def _to_utc(ts: str | datetime | None) -> datetime | None:
 # ---- Constants --------------------------------------------------------------
 
 # Keep defaults explicit and discoverable.
+# Note: Also defined at module level for external reference
 DEFAULT_INTERVAL_HOURS = 12
 DEFAULT_PAGE_LIMIT = 1000
 
@@ -130,7 +136,7 @@ class SyncScheduler:
         """Run incremental sync once, respecting public-only and cutoff filters.
 
         Behavior verified by tests:
-        - Fetch pages using client with `page_limit` (dev cap = 1000 default)
+        - Fetch pages using client with `page_limit` (dev cap = 1000 default) and updated_since cutoff
         - Filter to public pages (grant == 1)
         - Filter to pages with revision.updatedAt > last_synced_at
         - Pass filtered pages to processor and return count
@@ -144,16 +150,22 @@ class SyncScheduler:
 
         self._sync_in_progress = True
         started_at = _now_utc()
+        cutoff = self.last_synced_at
+        if cutoff is None:
+            self._logger.info("Starting full sync")
+        else:
+            self._logger.info("Starting differential sync since %s", cutoff.isoformat())
         try:
-            pages = self._safe_fetch_pages()
+            pages = self._safe_fetch_pages(updated_since=cutoff)
             public_pages = self._filter_public(pages)
-            candidates = self._filter_incremental(public_pages, self.last_synced_at)
+            candidates = self._filter_incremental(public_pages, cutoff)
 
             processed_count = self.processor.process_pages(candidates)  # type: ignore[arg-type]
 
             # Advance last_synced_at to the newest processed revision time
             self._update_last_synced_at(candidates)
 
+            self._logger.info("Processed %d pages", processed_count)
             self._logger.info(
                 "sync completed",
                 extra={
@@ -178,14 +190,14 @@ class SyncScheduler:
     def _compute_next_run(self) -> datetime:
         return _now_utc() + timedelta(hours=self.interval_hours)
 
-    def _safe_fetch_pages(self) -> List[Dict[str, Any]]:
-        """Fetch pages via client with the configured `page_limit`."""
-        return self.client.fetch_pages(limit=self.page_limit)
+    def _safe_fetch_pages(self, *, updated_since: datetime | None) -> List[Dict[str, Any]]:
+        """Fetch pages via client with the configured `page_limit` and optional cutoff."""
+        return self.client.fetch_pages(limit=self.page_limit, updated_since=updated_since)
 
     @staticmethod
     def _filter_public(pages: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Keep only public pages (grant == 1)."""
-        return [p for p in pages if p.get("grant") == 1]
+        return [p for p in pages if p.get("grant") == PUBLIC_PAGE_GRANT_VALUE]
 
     @staticmethod
     def _updated_at(page: Dict[str, Any]) -> Optional[datetime]:

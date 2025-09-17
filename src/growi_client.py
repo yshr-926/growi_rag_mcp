@@ -14,6 +14,7 @@ Notes
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 import logging
@@ -32,6 +33,10 @@ _DEFAULT_EXPAND_PARAMS = "tag,createdUser"  # T023: include tags and created use
 RETRY_BACKOFFS: List[int] = [1, 2, 4]
 # Retryable HTTP status codes (extendable)
 RETRYABLE_STATUS_CODES: set[int] = {503}
+
+# Date format constants for timestamp parsing
+_ISO_Z_SUFFIX = "Z"
+_ISO_UTC_SUFFIX = "+00:00"
 
 # Module-level logger to avoid recreating per instance
 _LOGGER: logging.Logger = get_logger("growi.client")
@@ -260,7 +265,7 @@ class GROWIClient:
         )
 
     # --- Pages API helpers -------------------------------------------------
-    def fetch_pages(self, limit: int = 1000) -> List[Dict[str, Any]]:
+    def fetch_pages(self, limit: int = 1000, updated_since: datetime | None = None) -> List[Dict[str, Any]]:
         """Fetch public GROWI pages with client-side pagination.
 
         Retrieves pages from `/api/v3/pages` in batches (max 100 per request),
@@ -271,6 +276,8 @@ class GROWIClient:
         ----------
         limit:
             Maximum number of public pages to return (default: 1000 during dev).
+        updated_since:
+            When provided, only pages strictly newer than this UTC timestamp are returned.
 
         Returns
         -------
@@ -309,7 +316,12 @@ class GROWIClient:
             for raw in batch:
                 if not self._is_public_page(raw):
                     continue
-                results.append(self._normalize_page(raw))
+                normalized = self._normalize_page(raw)
+                if updated_since is not None:
+                    page_updated = self._revision_updated_at(normalized)
+                    if page_updated is None or page_updated <= updated_since:
+                        continue
+                results.append(normalized)
                 added += 1
                 if len(results) >= limit:
                     break
@@ -376,3 +388,43 @@ class GROWIClient:
         meta_limit = meta.get("limit")
         step = meta_limit if isinstance(meta_limit, int) and meta_limit > 0 else fallback_step
         return offset + step, has_next
+
+    def _revision_updated_at(self, page: Dict[str, Any]) -> datetime | None:
+        """Return revision.updatedAt as an aware UTC datetime when possible.
+
+        Handles both string ISO timestamps (with Z or +00:00 suffix) and
+        datetime objects. Returns None for invalid or missing timestamps.
+
+        Parameters
+        ----------
+        page : Dict[str, Any]
+            Normalized page object with revision.updatedAt field
+
+        Returns
+        -------
+        datetime | None
+            UTC datetime or None if parsing fails
+        """
+        revision = page.get("revision") or {}
+        updated_at = revision.get("updatedAt")
+
+        if updated_at is None:
+            return None
+
+        if isinstance(updated_at, datetime):
+            # Ensure timezone awareness
+            return updated_at if updated_at.tzinfo else updated_at.replace(tzinfo=timezone.utc)
+
+        if isinstance(updated_at, str):
+            try:
+                # Convert Z suffix to explicit UTC offset for ISO parsing
+                normalized_timestamp = updated_at.replace(_ISO_Z_SUFFIX, _ISO_UTC_SUFFIX)
+                return datetime.fromisoformat(normalized_timestamp)
+            except (ValueError, TypeError) as exc:
+                self._logger.warning(
+                    "Failed to parse revision timestamp",
+                    extra={"timestamp": updated_at, "error": str(exc)},
+                )
+                return None
+
+        return None
