@@ -10,3 +10,11 @@ docs/
 rollback*.sh
 .coverage
 config.yaml
+
+# Data directories
+data/
+*.sqlite3
+*.db
+
+# Vector database files
+chroma_db/
