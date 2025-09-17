@@ -36,7 +36,7 @@ except ImportError:
     torch = None  # type: ignore
 
 # Constants kept close to the spec and tests
-DEFAULT_EMBEDDING_DIM = 1024
+DEFAULT_EMBEDDING_DIM = 2048  # plamo-embedding-1b actual dimension
 DEFAULT_DTYPE = np.float32
 MAX_TOKEN_LENGTH = 512  # Maximum sequence length for tokenization
 
@@ -81,35 +81,46 @@ class PlamoEmbeddingModel:
         Falls back to stub behavior for development environments.
         """
         if HAS_TRANSFORMERS:
-            if os.path.exists(self.model_path):
-                try:
-                    # Load actual plamo-embedding-1b model
+            # Try to load model (supports both local paths and model IDs)
+            try:
+                # Load actual plamo-embedding-1b model
+                # Support both local paths and Hugging Face model IDs
+                if os.path.exists(self.model_path):
+                    # Local path exists, load from directory
                     self._tokenizer = AutoTokenizer.from_pretrained(self.model_path)
                     self._model = AutoModel.from_pretrained(self.model_path)
-
-                    # Set device
-                    if self.device == "auto":
-                        device = "cuda" if torch.cuda.is_available() else "cpu"
-                    else:
-                        device = self.device
-
-                    self._model = self._model.to(device)
-                    self._model.eval()  # Set to evaluation mode
-
-                    self.is_ready = True
-                    return
-                except Exception as e:
-                    # If real model loading fails, raise error (T025 requirement)
-                    raise RuntimeError(f"Failed to load plamo-embedding model from {self.model_path}: {e}")
-            else:
-                # T025 requirement: error handling for missing model files
-                # Only raise error if the path looks like it should contain a model
-                # (contains 'model' in the name), otherwise fall back to stub
-                if 'model' in self.model_path.lower():
-                    raise FileNotFoundError(f"Model path does not exist: {self.model_path}")
+                elif self.model_path == "pfnet/plamo-embedding-1b" or "plamo-embedding" in self.model_path:
+                    # Load from Hugging Face Hub with trust_remote_code=True for plamo models
+                    self._tokenizer = AutoTokenizer.from_pretrained(self.model_path, trust_remote_code=True)
+                    self._model = AutoModel.from_pretrained(
+                        self.model_path,
+                        trust_remote_code=True,
+                        dtype=torch.float32
+                    )
                 else:
-                    # Fallback to stub behavior for non-model paths in development
-                    self.is_ready = True
+                    # For development/test paths that don't contain 'model', use fallback
+                    if 'model' in self.model_path.lower():
+                        raise FileNotFoundError(f"Model path does not exist: {self.model_path}")
+                    else:
+                        # Fallback to stub behavior for non-model paths in development
+                        self.is_ready = True
+                        return
+
+                # Set device
+                if self.device == "auto":
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                else:
+                    device = self.device
+
+                self._model = self._model.to(device)
+                self._model.eval()  # Set to evaluation mode
+
+                self.is_ready = True
+                return
+
+            except Exception as e:
+                # If real model loading fails, raise error (T025 requirement)
+                raise RuntimeError(f"Failed to load plamo-embedding model from {self.model_path}: {e}")
         else:
             # Fallback to stub behavior for development without transformers
             self.is_ready = True
@@ -178,6 +189,9 @@ class PlamoEmbeddingModel:
                 embeddings = torch.mean(last_hidden_state, dim=1).squeeze()
 
             # Convert to numpy and normalize
+            # Handle BFloat16 by converting to float32 first
+            if embeddings.dtype == torch.bfloat16:
+                embeddings = embeddings.float()
             embedding_np = embeddings.cpu().numpy().astype(self._dtype)
             return self._l2_normalize(embedding_np)
 

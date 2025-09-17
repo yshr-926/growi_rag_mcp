@@ -22,7 +22,7 @@ Notes:
   returning results with:
     {
       "chunk_id": "<page_id>#<chunk_index>",
-      "embedding": numpy.ndarray of shape (1024,), L2-normalized,
+      "embedding": numpy.ndarray of shape (2048,), L2-normalized,
       "metadata": { page_id, chunk_index, headings_path, tags, page_title, url, updated_at }
     }
   and log progress at INFO level via logger name `vector.embedding_pipeline`.
@@ -102,7 +102,7 @@ class TestEmbeddingPipeline:
             # Embedding vector checks
             emb = r.get("embedding")
             assert isinstance(emb, np.ndarray), "'embedding' must be a numpy.ndarray"
-            assert emb.ndim == 1 and emb.shape[0] == 1024, "Embedding must be 1-D vector of length 1024"
+            assert emb.ndim == 1 and emb.shape[0] == 2048, "Embedding must be 1-D vector of length 2048"
             norm = float(np.linalg.norm(emb))
             assert 0.99 <= norm <= 1.01, "Embedding should be approximately L2-normalized"
 

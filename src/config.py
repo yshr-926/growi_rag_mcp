@@ -226,16 +226,17 @@ class SummarizerConfig(BaseModel):
     Configuration for the LLM used for text summarization.
 
     Attributes:
-        model_path (str): Local path to the summarization model.
-                         Defaults to '/models/gpt-oss-20b'.
+        provider (str): LLM provider name (openai, local, etc.). Defaults to 'openai'.
+        model (str): Model name/identifier. For OpenAI: gpt-4, gpt-4-turbo, etc.
         temperature (float): Generation temperature for creativity/randomness. Defaults to 0.2.
-        max_new_tokens (int): Maximum number of tokens to generate. Defaults to 512.
-        device (str): Device selection for model execution. Defaults to 'auto'.
+        max_tokens (int): Maximum number of tokens to generate. Defaults to 512.
+        api_key (str): API key for the provider (if using API-based models).
     """
-    model_path: str = Field(default=DEFAULT_SUMMARIZER_MODEL_PATH, description="Path to local summarization model")
+    provider: str = Field(default="openai", description="LLM provider name")
+    model: str = Field(default="gpt-4", description="Model name/identifier")
     temperature: float = Field(default=DEFAULT_SUMMARIZER_TEMPERATURE, description="Generation temperature", ge=0.0, le=2.0)
-    max_new_tokens: int = Field(default=DEFAULT_MAX_NEW_TOKENS, description="Maximum tokens to generate", ge=1, le=4096)
-    device: str = Field(default=DEFAULT_DEVICE, description="Device selection")
+    max_tokens: int = Field(default=DEFAULT_MAX_NEW_TOKENS, description="Maximum tokens to generate", ge=1, le=4096)
+    api_key: str = Field(default="", description="API key for the provider")
 
 
 class ModelsConfig(BaseModel):
@@ -398,5 +399,16 @@ class ConfigManager:
         # Vector DB overrides
         if 'VECTOR_DB_PERSIST_DIR' in os.environ:
             yaml_data['vector_db']['persist_directory'] = os.environ['VECTOR_DB_PERSIST_DIR']
+
+        # Models overrides
+        if 'models' not in yaml_data:
+            yaml_data['models'] = {}
+        if 'summarizer' not in yaml_data['models']:
+            yaml_data['models']['summarizer'] = {}
+
+        if 'OPENAI_API_KEY' in os.environ:
+            yaml_data['models']['summarizer']['api_key'] = os.environ['OPENAI_API_KEY']
+        if 'SUMMARIZER_MODEL' in os.environ:
+            yaml_data['models']['summarizer']['model'] = os.environ['SUMMARIZER_MODEL']
 
         return yaml_data
