@@ -14,16 +14,28 @@ Scope:
 
 from __future__ import annotations
 
+import json
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Iterable, List, Optional, Protocol
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Union
+from contextlib import contextmanager
 
 from src.logging_config import get_logger
 
 # Default configuration constants
-DEFAULT_SYNC_INTERVAL_HOURS = 12
+DEFAULT_INTERVAL_HOURS = 12
 DEFAULT_PAGE_LIMIT = 1000  # Development phase limit
 PUBLIC_PAGE_GRANT_VALUE = 1
+
+# Type aliases for improved readability
+Page = Dict[str, Any]
+ProcessorResult = Union[int, Mapping[str, Any]]
+
+# Backwards compatibility
+DEFAULT_SYNC_INTERVAL_HOURS = DEFAULT_INTERVAL_HOURS
 
 
 class _Client(Protocol):
@@ -33,7 +45,7 @@ class _Client(Protocol):
         - fetch_pages(limit=int, updated_since=datetime|None) -> List[Dict[str, Any]]
     """
 
-    def fetch_pages(self, *, limit: int, updated_since: datetime | None = None) -> List[Dict[str, Any]]:  # pragma: no cover - interface
+    def fetch_pages(self, *, limit: int, updated_since: datetime | None = None) -> List[Page]:  # pragma: no cover - interface
         ...
 
 
@@ -43,7 +55,7 @@ class _Processor(Protocol):
     Any object exposing `process_pages(List[Dict[str, Any]]) -> int` is accepted.
     """
 
-    def process_pages(self, pages: List[Dict[str, Any]]) -> int:  # pragma: no cover - interface
+    def process_pages(self, pages: List[Page]) -> ProcessorResult:  # pragma: no cover - interface
         ...
 
 
@@ -79,7 +91,7 @@ DEFAULT_PAGE_LIMIT = 1000
 
 @dataclass
 class SyncScheduler:
-    """Background sync scheduler with incremental filtering.
+    """Production background sync scheduler with persistence and automatic execution.
 
     Parameters
     ----------
@@ -87,11 +99,16 @@ class SyncScheduler:
         Object implementing `fetch_pages(limit=int) -> List[Dict[str, Any]]`.
         Must call GROWI API v3 with Bearer token (enforced elsewhere).
     processor:
-        Object implementing `process_pages(List[Dict[str, Any]]) -> int`.
+        Object implementing `process_pages(List[Dict[str, Any]]) -> int|Dict`.
+        Can return either count (backward compatibility) or metrics dict.
     interval_hours:
         Schedule interval in hours. Defaults to 12 hours.
     page_limit:
         Maximum number of pages to fetch per run. Defaults to 1000 for dev.
+    state_file:
+        Optional path to JSON file for persisting sync state across restarts.
+    auto_start:
+        If True, automatically run full sync on start() and schedule background tasks.
     """
 
     client: _Client
@@ -99,21 +116,41 @@ class SyncScheduler:
     interval_hours: int = DEFAULT_INTERVAL_HOURS
     page_limit: int = DEFAULT_PAGE_LIMIT
     logger_name: str = "growi.sync_scheduler"
+    state_file: Optional[str] = None
+    auto_start: bool = False
 
     last_synced_at: datetime | None = None
     next_run_at: datetime | None = None
     _sync_in_progress: bool = field(default=False, init=False, repr=False)
+    _background_thread: Optional[threading.Thread] = field(default=None, init=False, repr=False)
+    _stop_event: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
+    _is_running: bool = field(default=False, init=False, repr=False)
 
-    def __post_init__(self) -> None:  # pragma: no cover - trivial
+    def __post_init__(self) -> None:
         self._logger = get_logger(self.logger_name)
+        if self.state_file:
+            self._load_state()
 
     # --- Public API -----------------------------------------------------
     def start(self) -> None:
-        """Initialize the scheduler by computing the initial `next_run_at`."""
+        """Initialize the scheduler and start background execution."""
         self.next_run_at = self._compute_next_run()
+        self._is_running = True
+
+        # Always start background thread for automatic syncs if auto_start is enabled
+        if self.auto_start:
+            self._start_background_scheduler()
+
+        # Always trigger initial full sync in background
+        threading.Thread(target=self._run_initial_sync, daemon=True).start()
+
         self._logger.info(
             "scheduler started",
-            extra={"interval_hours": self.interval_hours, "next_run_at": self._iso(self.next_run_at)},
+            extra={
+                "interval_hours": self.interval_hours,
+                "next_run_at": self._iso(self.next_run_at),
+                "auto_start": self.auto_start
+            },
         )
 
     def request_sync(self) -> bool:
@@ -132,6 +169,21 @@ class SyncScheduler:
         self.run_sync_now()
         return True
 
+    def stop(self) -> None:
+        """Stop background scheduler and cleanup threads."""
+        self._is_running = False
+        self._stop_event.set()
+
+        if self._background_thread and self._background_thread.is_alive():
+            self._background_thread.join(timeout=1.0)
+
+        self._logger.info("scheduler stopped")
+
+    @property
+    def is_running(self) -> bool:
+        """Check if scheduler is currently running."""
+        return self._is_running
+
     def run_sync_now(self) -> Dict[str, Any]:
         """Run incremental sync once, respecting public-only and cutoff filters.
 
@@ -143,48 +195,53 @@ class SyncScheduler:
         - Always schedule next run and reset in-progress flag
         - On error, log and re-raise
         """
-        if self._sync_in_progress:
-            # Secondary guard; primary duplicate handling is in request_sync
-            self._logger.info("Skip sync request: already in progress")
-            return {"processed": 0}
+        with self._sync_guard() as can_run:
+            if not can_run:
+                self._logger.info("Skip sync request: already in progress")
+                return {"processed": 0}
 
-        self._sync_in_progress = True
-        started_at = _now_utc()
-        cutoff = self.last_synced_at
-        if cutoff is None:
-            self._logger.info("Starting full sync")
-        else:
-            self._logger.info("Starting differential sync since %s", cutoff.isoformat())
-        try:
-            pages = self._safe_fetch_pages(updated_since=cutoff)
-            public_pages = self._filter_public(pages)
-            candidates = self._filter_incremental(public_pages, cutoff)
+            started_at = _now_utc()
+            cutoff = self.last_synced_at
+            if cutoff is None:
+                self._logger.info("Starting full sync")
+            else:
+                self._logger.info("Starting differential sync since %s", cutoff.isoformat())
 
-            processed_count = self.processor.process_pages(candidates)  # type: ignore[arg-type]
+            try:
+                pages = self._safe_fetch_pages(updated_since=cutoff)
+                public_pages = self._filter_public(pages)
+                candidates = self._filter_incremental(public_pages, cutoff)
 
-            # Advance last_synced_at to the newest processed revision time
-            self._update_last_synced_at(candidates)
+                processed_result = self.processor.process_pages(candidates)  # type: ignore[arg-type]
 
-            self._logger.info("Processed %d pages", processed_count)
-            self._logger.info(
-                "sync completed",
-                extra={
-                    "processed": processed_count,
-                    "duration_ms": int((_now_utc() - started_at).total_seconds() * 1000),
-                },
-            )
-            return {"processed": processed_count}
-        except Exception as exc:  # Let tests assert specific exception types from client
-            # Error path: ensure logging and scheduling still happen in finally
-            self._logger.error(
-                "sync failed",
-                extra={"error": str(exc), "phase": "run_sync_now"},
-            )
-            raise
-        finally:
-            # Always reset state and schedule next run
-            self._sync_in_progress = False
-            self.next_run_at = self._compute_next_run()
+                # Handle both int (backward compatibility) and dict returns
+                if isinstance(processed_result, dict):
+                    processed_count = processed_result.get("pages_processed", len(candidates))
+                    result_metrics = processed_result
+                else:
+                    processed_count = processed_result
+                    result_metrics = {"processed": processed_count}
+
+                # Advance last_synced_at to the newest processed revision time
+                self._update_last_synced_at(candidates)
+                if self.state_file:
+                    self._save_state()
+
+                self._logger.info("Processed %d pages", processed_count)
+                self._logger.info(
+                    "sync completed",
+                    extra={
+                        "processed": processed_count,
+                        "duration_ms": int((_now_utc() - started_at).total_seconds() * 1000),
+                    },
+                )
+                return result_metrics
+            except Exception as exc:  # Let tests assert specific exception types from client
+                self._logger.error(
+                    "sync failed",
+                    extra={"error": str(exc), "phase": "run_sync_now"},
+                )
+                raise
 
     # --- Internals ------------------------------------------------------
     def _compute_next_run(self) -> datetime:
@@ -235,3 +292,91 @@ class SyncScheduler:
         if dt is None:
             return None
         return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    # --- State persistence ---
+    def _load_state(self) -> None:
+        """Load sync state from file if it exists."""
+        if not self.state_file:
+            return
+
+        try:
+            path = Path(self.state_file)
+            if path.exists():
+                data = json.loads(path.read_text())
+                if "last_synced_at" in data:
+                    self.last_synced_at = datetime.fromisoformat(data["last_synced_at"])
+        except Exception as e:
+            self._logger.warning(f"Failed to load state from {self.state_file}: {e}")
+
+    def _save_state(self) -> None:
+        """Save sync state to file."""
+        if not self.state_file:
+            return
+
+        try:
+            path = Path(self.state_file)
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            data = {}
+            if self.last_synced_at:
+                data["last_synced_at"] = self.last_synced_at.isoformat()
+
+            path.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            self._logger.warning(f"Failed to save state to {self.state_file}: {e}")
+
+    # --- Background scheduling ---
+    def _start_background_scheduler(self) -> None:
+        """Start background thread for periodic syncs."""
+        if self._background_thread and self._background_thread.is_alive():
+            return
+
+        self._background_thread = threading.Thread(
+            target=self._background_worker,
+            name="growi-sync-scheduler",
+            daemon=True
+        )
+        self._background_thread.start()
+
+    def _background_worker(self) -> None:
+        """Background worker that runs periodic syncs."""
+        while not self._stop_event.is_set():
+            # Wait for the interval or stop signal
+            if self._stop_event.wait(timeout=self.interval_hours * 3600):
+                break  # Stop signal received
+
+            if not self._sync_in_progress:
+                try:
+                    self.run_sync_now()
+                except Exception as e:
+                    self._logger.error(f"Background sync failed: {e}")
+
+    def _run_initial_sync(self) -> None:
+        """Run initial full sync in background."""
+        try:
+            # Small delay to let start() complete
+            time.sleep(0.1)
+            self.run_sync_now()
+        except Exception as e:
+            self._logger.error(f"Initial sync failed: {e}")
+
+    @contextmanager
+    def _sync_guard(self):
+        """Context manager to ensure exclusive sync execution."""
+        if self._sync_in_progress:
+            yield False
+            return
+
+        self._sync_in_progress = True
+        try:
+            yield True
+        finally:
+            self._sync_in_progress = False
+            self.next_run_at = self._compute_next_run()
+
+    def _join_thread(self, thread: Optional[threading.Thread], timeout: float = 1.0) -> None:
+        """Safely join a thread with timeout and logging."""
+        if thread and thread.is_alive():
+            thread.join(timeout=timeout)
+            if thread.is_alive():
+                self._logger.warning(f"Thread {thread.name} did not stop within {timeout}s")
