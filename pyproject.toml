@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Retrieval Augmented Generation MCP server for GROWI wiki integration"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp[cli]>=1.0.0",
     "transformers>=4.30.0",
     "torch>=2.0.0",
     "chromadb>=0.4.0",
@@ -22,6 +22,8 @@ dependencies = [
     "numpy>=2.3.3",
     "sentencepiece>=0.2.1",
     "openai>=1.107.3",
+    "fastmcp>=2.12.3",
+    "mcp-server>=0.1.4",
 ]
 
 [project.optional-dependencies]
