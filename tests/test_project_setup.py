@@ -112,7 +112,7 @@ class TestDirectoryStructure:
 
         assert src_path.exists() and src_path.is_dir(), "src/ directory should exist"
 
-        required_dirs = ["growi", "vector", "llm", "mcp"]
+        required_dirs = ["growi", "vector", "llm", "mcp_handlers"]
         for dir_name in required_dirs:
             dir_path = src_path / dir_name
             assert dir_path.exists() and dir_path.is_dir(), \

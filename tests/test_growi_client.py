@@ -19,18 +19,22 @@ def _make_handler(expected_token: str, recorder: dict):
             return
 
         def do_GET(self):
-            auth = self.headers.get("Authorization")
-            recorder["last_auth"] = auth
+            # Parse URL parameters for access_token
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(self.path)
+            query_params = parse_qs(parsed.query)
+            access_token = query_params.get("access_token", [None])[0]
+            recorder["last_auth"] = access_token
 
-            if self.path.startswith("/ok"):
+            if parsed.path.startswith("/ok"):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(_json_bytes({"ok": True, "message": "hello"}))
                 return
 
-            if self.path.startswith("/need-auth"):
-                if auth == f"Bearer {expected_token}":
+            if parsed.path.startswith("/need-auth"):
+                if access_token == expected_token:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
@@ -68,7 +72,7 @@ def auth_test_server():
 
 
 class TestGROWIClientAuthentication:
-    def test_authenticated_request_includes_bearer_token_header(self, auth_test_server):
+    def test_authenticated_request_includes_access_token_param(self, auth_test_server):
         base_url, recorder, expected_token = auth_test_server
 
         # Import deferred so the test fails red if client is missing
@@ -77,8 +81,8 @@ class TestGROWIClientAuthentication:
         client = GROWIClient(base_url=base_url, token=expected_token)
         resp = client.get("/ok")
 
-        # Authorization header must be present and correct
-        assert recorder.get("last_auth") == f"Bearer {expected_token}"
+        # Access token parameter must be present and correct
+        assert recorder.get("last_auth") == expected_token
         assert isinstance(resp, dict)
         assert resp.get("ok") is True
 

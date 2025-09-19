@@ -19,21 +19,27 @@ def _make_handler(expected_token: str, recorder: dict):
             return
 
         def do_GET(self):
-            # Record request info for assertions
-            recorder["last_path"] = self.path
-            recorder["last_auth"] = self.headers.get("Authorization")
+            # Parse URL parameters for access_token
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(self.path)
+            query_params = parse_qs(parsed.query)
+            access_token = query_params.get("access_token", [None])[0]
 
-            if self.path.startswith("/api/v3/ok"):
-                # Always OK endpoint to validate headers and v3 path
+            # Record request info for assertions
+            recorder["last_path"] = parsed.path
+            recorder["last_auth"] = access_token
+
+            if parsed.path.startswith("/_api/v3/ok"):
+                # Always OK endpoint to validate parameters and v3 path
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(_json_bytes({"ok": True, "message": "v3 hello"}))
                 return
 
-            if self.path.startswith("/api/v3/need-auth"):
-                # Require exact Bearer token
-                if recorder["last_auth"] == f"Bearer {expected_token}":
+            if parsed.path.startswith("/_api/v3/need-auth"):
+                # Require exact access token
+                if access_token == expected_token:
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
@@ -72,8 +78,8 @@ def v3_auth_test_server():
 
 
 class TestGROWIClientAuthV3:
-    def test_authenticated_request_uses_v3_and_bearer(self, v3_auth_test_server):
-        """Given token and endpoint, client must call /api/v3 and set Bearer header."""
+    def test_authenticated_request_uses_v3_and_access_token(self, v3_auth_test_server):
+        """Given token and endpoint, client must call /_api/v3 and set access_token parameter."""
         base_url, recorder, expected_token = v3_auth_test_server
 
         # Import deferred so the test fails red if client is missing or API not implemented
@@ -81,15 +87,15 @@ class TestGROWIClientAuthV3:
 
         client = GROWIClient(base_url=base_url, token=expected_token)
 
-        # Call a logical endpoint without the /api/v3 prefix; the client must add it
+        # Call a logical endpoint without the /_api/v3 prefix; the client must add it
         resp = client.get("/ok")
 
         # Must have used API v3 path
-        assert recorder.get("last_path", "").startswith("/api/v3/ok"), (
-            "Client must use GROWI API v3 base path (/api/v3) for requests"
+        assert recorder.get("last_path", "").startswith("/_api/v3/ok"), (
+            "Client must use GROWI API v3 base path (/_api/v3) for requests"
         )
-        # Must include proper Bearer token header
-        assert recorder.get("last_auth") == f"Bearer {expected_token}"
+        # Must include proper access token parameter
+        assert recorder.get("last_auth") == expected_token
         assert isinstance(resp, dict) and resp.get("ok") is True
 
     def test_invalid_token_raises_auth_error_with_clear_message(self, v3_auth_test_server):

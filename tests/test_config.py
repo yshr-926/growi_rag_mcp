@@ -49,7 +49,7 @@ class TestConfigManager:
         # Verify GROWI config structure
         assert hasattr(config.growi, 'base_url')
         assert hasattr(config.growi, 'api_token')
-        assert config.growi.base_url == "http://localhost:3000"
+        assert config.growi.base_url == "http://localhost:3001"
 
     def test_vector_db_configuration_loaded_correctly(self):
         """Test that vector database configuration is loaded correctly."""
