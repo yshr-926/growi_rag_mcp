@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from src.mcp import tools as tools_module
+from src.mcp_handlers import tools as tools_module
 from src.vector_store import ChromaVectorStore
 
 
@@ -60,7 +60,7 @@ def embedding_records():
     return [
         {
             "chunk_id": "page1#0",
-            "embedding": np.random.rand(1024).astype(np.float32),
+            "embedding": np.random.rand(2048).astype(np.float32),
             "metadata": {
                 "page_id": "page1",
                 "chunk_index": 0,
@@ -74,7 +74,7 @@ def embedding_records():
         },
         {
             "chunk_id": "page2#0",
-            "embedding": np.random.rand(1024).astype(np.float32),
+            "embedding": np.random.rand(2048).astype(np.float32),
             "metadata": {
                 "page_id": "page2",
                 "chunk_index": 0,
@@ -119,9 +119,9 @@ class TestGROWIRetrieveVectorIntegration:
             return MagicMock(load_config=MagicMock(return_value=config))
 
         # Apply patches
-        monkeypatch.setattr("src.mcp.tools.PlamoEmbeddingModel", mock_plamo_model)
-        monkeypatch.setattr("src.mcp.tools.ConfigManager", mock_config_manager)
-        monkeypatch.setattr("src.mcp.tools.ChromaVectorStore", lambda **kwargs: vector_store)
+        monkeypatch.setattr("src.mcp_handlers.tools.PlamoEmbeddingModel", mock_plamo_model)
+        monkeypatch.setattr("src.mcp_handlers.tools.ConfigManager", mock_config_manager)
+        monkeypatch.setattr("src.mcp_handlers.tools.ChromaVectorStore", lambda **kwargs: vector_store)
 
         # Execute the tool
         query = "GROWI Docker install guide"
@@ -164,7 +164,7 @@ class TestGROWIRetrieveVectorIntegration:
 
         # Mock the embedding model to return very different embedding (low similarity)
         mock_model = MagicMock()
-        mock_model.embed.return_value = np.ones(1024) * -1  # Opposite direction vector
+        mock_model.embed.return_value = np.ones(2048) * -1  # Opposite direction vector
 
         # Mock model loading and configuration
         def mock_plamo_model(*args, **kwargs):
@@ -177,9 +177,9 @@ class TestGROWIRetrieveVectorIntegration:
             return MagicMock(load_config=MagicMock(return_value=config))
 
         # Apply patches
-        monkeypatch.setattr("src.mcp.tools.PlamoEmbeddingModel", mock_plamo_model)
-        monkeypatch.setattr("src.mcp.tools.ConfigManager", mock_config_manager)
-        monkeypatch.setattr("src.mcp.tools.ChromaVectorStore", lambda **kwargs: vector_store)
+        monkeypatch.setattr("src.mcp_handlers.tools.PlamoEmbeddingModel", mock_plamo_model)
+        monkeypatch.setattr("src.mcp_handlers.tools.ConfigManager", mock_config_manager)
+        monkeypatch.setattr("src.mcp_handlers.tools.ChromaVectorStore", lambda **kwargs: vector_store)
 
         # Execute the tool with high relevance threshold
         query = "completely unrelated query"

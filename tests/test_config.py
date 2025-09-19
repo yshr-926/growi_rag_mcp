@@ -49,7 +49,7 @@ class TestConfigManager:
         # Verify GROWI config structure
         assert hasattr(config.growi, 'base_url')
         assert hasattr(config.growi, 'api_token')
-        assert config.growi.base_url == "https://heroz.growi.cloud/"
+        assert config.growi.base_url == "http://localhost:3001"
 
     def test_vector_db_configuration_loaded_correctly(self):
         """Test that vector database configuration is loaded correctly."""
@@ -67,9 +67,9 @@ class TestConfigManager:
 
         # Verify LLM config
         assert config.llm.provider == "openai"
-        assert config.llm.model == "gpt-3.5-turbo"
+        assert config.llm.model == "gpt-4"
         assert config.llm.max_tokens == 4096
-        assert config.llm.temperature == 0.7
+        assert config.llm.temperature == 0.2
 
     def test_mcp_configuration_loaded_correctly(self):
         """Test that MCP configuration is loaded correctly."""
@@ -211,3 +211,60 @@ class TestConfigClass:
         required_attrs = ['server', 'logging', 'growi', 'vector_db', 'llm', 'mcp']
         for attr in required_attrs:
             assert hasattr(config, attr), f"Config missing required attribute: {attr}"
+
+
+class TestConfigYamlHierarchicalStructure:
+    """Test cases for T024 - hierarchical config.yaml structure requirements."""
+
+    def test_config_yaml_has_required_hierarchical_sections(self):
+        """Test that config.yaml has the required hierarchical sections."""
+        import yaml
+        from pathlib import Path
+
+        config_path = Path("config.yaml")
+        assert config_path.exists(), "config.yaml file must exist"
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config_data = yaml.safe_load(f)
+
+        # T024 requirement: hierarchical structure with growi, mcp, models sections
+        required_sections = ['growi', 'mcp', 'models']
+        for section in required_sections:
+            assert section in config_data, f"config.yaml missing required section: {section}"
+
+        # Verify models section has embedding and summarizer subsections
+        assert 'embedding' in config_data['models'], "models section missing 'embedding' subsection"
+        assert 'summarizer' in config_data['models'], "models section missing 'summarizer' subsection"
+
+    def test_config_manager_loads_hierarchical_structure(self):
+        """Test that ConfigManager can load and parse hierarchical config.yaml."""
+        config_manager = ConfigManager()
+        config = config_manager.load_config("config.yaml")
+
+        # T024 requirement: all configuration values are parsed and accessible
+        assert hasattr(config, 'growi'), "Config missing growi section"
+        assert hasattr(config, 'mcp'), "Config missing mcp section"
+        assert hasattr(config, 'models'), "Config missing models section"
+
+        # Verify nested access works
+        assert hasattr(config.growi, 'api_url'), "growi section missing api_url"
+        assert hasattr(config.growi, 'api_token'), "growi section missing api_token"
+        assert hasattr(config.models, 'embedding'), "models section missing embedding"
+        assert hasattr(config.models, 'summarizer'), "models section missing summarizer"
+
+    @patch.dict(os.environ, {'GROWI_API_TOKEN': 'env-override-token'})
+    def test_growi_api_token_environment_override(self):
+        """Test that GROWI_API_TOKEN environment variable overrides yaml token."""
+        config_manager = ConfigManager()
+        config = config_manager.load_config("config.yaml")
+
+        # T024 requirement: environment variable value overrides yaml token
+        assert config.growi.api_token == 'env-override-token', \
+            "Environment variable GROWI_API_TOKEN should override yaml value"
+
+    def test_config_missing_file_raises_filenotfound(self):
+        """Test that missing config.yaml raises FileNotFoundError."""
+        config_manager = ConfigManager()
+
+        with pytest.raises(FileNotFoundError):
+            config_manager.load_config("nonexistent-config.yaml")

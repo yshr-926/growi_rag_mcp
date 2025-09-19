@@ -16,5 +16,11 @@ data/
 *.sqlite3
 *.db
 
+test_data/
+
 # Vector database files
 chroma_db/
+
+.DS_Store
+
+reference/

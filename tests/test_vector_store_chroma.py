@@ -77,12 +77,12 @@ class TestChromaVectorStorePersistence:
             _make_chunk("pageB", 0, "Overview"),
         ]
 
-        model = PlamoEmbeddingModel(model_path="./models/plamo-embedding-1b", device="auto")
+        model = PlamoEmbeddingModel(model_path="pfnet/plamo-embedding-1b", device="auto")
         model.load()
         recs = generate_embeddings(chunks, model=model, batch_size=2)
 
         # Sanity to ensure the failure is about vector store, not embeddings
-        assert all(isinstance(r.get("embedding"), np.ndarray) and r["embedding"].shape == (1024,) for r in recs)
+        assert all(isinstance(r.get("embedding"), np.ndarray) and r["embedding"].shape == (2048,) for r in recs)
         assert all("chunk_id" in r and "metadata" in r for r in recs)
         return recs
 

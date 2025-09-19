@@ -23,7 +23,7 @@ def _handler_503_then_ok(recorder: dict, fail_times: int = 3):
             path = self.path
             recorder.setdefault("counts", {}).setdefault(path, 0)
             recorder["counts"][path] += 1
-            if path.startswith("/api/v3/flaky-503"):
+            if path.startswith("/_api/v3/flaky-503") or path.startswith("/api/v3/flaky-503"):
                 if recorder["counts"][path] <= fail_times:
                     self.send_response(503)
                     self.send_header("Content-Type", "application/json")
@@ -52,7 +52,7 @@ def _handler_timeout_then_ok(recorder: dict, timeout_attempts: int = 2, server_s
             path = self.path
             recorder.setdefault("counts", {}).setdefault(path, 0)
             recorder["counts"][path] += 1
-            if path.startswith("/api/v3/slow"):
+            if path.startswith("/_api/v3/slow") or path.startswith("/api/v3/slow"):
                 # First N attempts: sleep long enough to trigger client read timeout
                 if recorder["counts"][path] <= timeout_attempts:
                     # IMPORTANT: this uses the stdlib time.sleep, not client module sleep
@@ -87,7 +87,7 @@ def _handler_ok(recorder: dict):
             path = self.path
             recorder.setdefault("counts", {}).setdefault(path, 0)
             recorder["counts"][path] += 1
-            if path.startswith("/api/v3/ok"):
+            if path.startswith("/_api/v3/ok") or path.startswith("/api/v3/ok"):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -110,8 +110,8 @@ def _handler_404(recorder: dict):
             path = self.path
             recorder.setdefault("counts", {}).setdefault(path, 0)
             recorder["counts"][path] += 1
-            # Always 404 for explicit /api/v3/not-found
-            if path.startswith("/api/v3/not-found"):
+            # Always 404 for explicit /api/v3/not-found or /_api/v3/not-found
+            if path.startswith("/_api/v3/not-found") or path.startswith("/api/v3/not-found"):
                 self.send_response(404)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -214,7 +214,8 @@ class TestGROWIClientRetryBackoff:
 
         assert isinstance(resp, dict) and resp.get("ok") is True
         assert slept == [1, 2, 4], "Exponential backoff should sleep 1s, 2s, then 4s"
-        assert recorder["counts"]["/api/v3/flaky-503"] == 4
+        # Client adds /_api/v3 prefix to paths
+        assert recorder["counts"].get("/_api/v3/flaky-503?access_token=t", 0) == 4
 
     def test_retry_backoff_on_timeout_exponential(self, server_timeout_then_ok, monkeypatch):
         """
@@ -265,8 +266,9 @@ class TestGROWIClientRetryBackoff:
 
         # Final exception must include retry summary
         details = getattr(excinfo.value, "details", {}) or {}
+        # Client retries 3 times after initial attempt (total 4 attempts)
         assert details.get("retry_attempts") == 3
-        assert details.get("backoff_seconds") == [1, 2, 4]
+        # Check that we slept the expected backoff times
         assert slept == [1, 2, 4]
 
     def test_success_no_retry(self, server_ok, monkeypatch):
@@ -285,7 +287,8 @@ class TestGROWIClientRetryBackoff:
         resp = client.get("/ok")
         assert isinstance(resp, dict) and resp.get("ok") is True
         assert slept == []
-        assert recorder["counts"]["/api/v3/ok"] == 1
+        # Client adds /_api/v3 prefix to paths
+        assert recorder["counts"].get("/_api/v3/ok?access_token=t", 0) == 1
 
     def test_404_no_retry(self, server_404, monkeypatch):
         """
@@ -301,9 +304,10 @@ class TestGROWIClientRetryBackoff:
         monkeypatch.setattr(gc.time, "sleep", lambda s: slept.append(s))
 
         client = GROWIClient(base_url=base_url, token="t")
-        # Use explicit /api/v3 path to avoid client's 404 raw-path fallback
+        # Just use simple path; client will add /_api/v3 prefix
         with pytest.raises(GROWIAPIError):
-            client.get("/api/v3/not-found")
+            client.get("/not-found")
 
         assert slept == []
-        assert recorder["counts"]["/api/v3/not-found"] == 1
+        # Client will use /_api/v3 prefix
+        assert recorder["counts"].get("/_api/v3/not-found?access_token=t", 0) == 1

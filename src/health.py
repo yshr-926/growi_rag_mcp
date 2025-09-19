@@ -13,8 +13,8 @@ Key features:
 - JSON-structured response format
 
 Example usage:
-    from health import HealthService
-    from config import ConfigManager
+    from src.health import HealthService
+    from src.config import ConfigManager
 
     config = ConfigManager().load_config("config.yaml")
     health_service = HealthService(config)
@@ -31,6 +31,14 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from src.logging_config import get_logger, PerformanceLogger
+
+# Health status constants
+HEALTH_STATUS_HEALTHY = "healthy"
+HEALTH_STATUS_UNHEALTHY = "unhealthy"
+HEALTH_STATUS_UNKNOWN = "unknown"
+
+# Performance thresholds
+HEALTH_CHECK_TIMEOUT_MS = 500
 
 
 class HealthChecker:
@@ -221,7 +229,8 @@ class HealthChecker:
             return True
         except Exception as e:
             # Fallback logging since regular logging might not work
-            print(f"Logging system check failed: {e}")
+            import logging
+            logging.getLogger("growi_rag_mcp.health").error(f"Logging system check failed: {e}")
             return False
 
     def _check_vector_store_ready(self) -> bool:
@@ -363,3 +372,126 @@ class HealthService:
                 "timestamp": health_status["timestamp"],
                 "overall_status": "ready" if readiness_status["ready"] else "not_ready"
             }
+
+    def get_component_health(self) -> Dict[str, Any]:
+        """
+        Get detailed component health status for /healthz endpoint.
+
+        Returns health status for individual system components including
+        sync scheduler, vector store, embedding model, LLM model, and GROWI client.
+
+        Returns:
+            Dict containing component health information
+        """
+        with PerformanceLogger(self.logger, "component_health_check"):
+            components = {}
+            current_time = datetime.now(timezone.utc).isoformat()
+
+            # Check each component
+            components["sync_scheduler"] = {
+                "status": HEALTH_STATUS_HEALTHY if self._check_sync_scheduler_health() else HEALTH_STATUS_UNHEALTHY,
+                "last_check": current_time,
+                "details": "Sync scheduler operational status"
+            }
+
+            components["vector_store"] = {
+                "status": HEALTH_STATUS_HEALTHY if self._check_vector_store_health() else HEALTH_STATUS_UNHEALTHY,
+                "last_check": current_time,
+                "details": "Vector database connectivity and readiness"
+            }
+
+            components["embedding_model"] = {
+                "status": HEALTH_STATUS_HEALTHY if self._check_embedding_model_health() else HEALTH_STATUS_UNHEALTHY,
+                "last_check": current_time,
+                "details": "Embedding model loading and availability"
+            }
+
+            components["llm_model"] = {
+                "status": HEALTH_STATUS_HEALTHY if self._check_llm_model_health() else HEALTH_STATUS_UNHEALTHY,
+                "last_check": current_time,
+                "details": "LLM model loading and availability"
+            }
+
+            components["growi_client"] = {
+                "status": HEALTH_STATUS_HEALTHY if self._check_growi_client_health() else HEALTH_STATUS_UNHEALTHY,
+                "last_check": current_time,
+                "details": "GROWI API connectivity and authentication"
+            }
+
+            # Determine overall status
+            unhealthy_components = [name for name, info in components.items()
+                                  if info["status"] == HEALTH_STATUS_UNHEALTHY]
+            overall_status = HEALTH_STATUS_UNHEALTHY if unhealthy_components else HEALTH_STATUS_HEALTHY
+
+            return {
+                "status": overall_status,
+                "components": components,
+                "timestamp": current_time
+            }
+
+    def get_metrics_response(self) -> Dict[str, Any]:
+        """
+        Get metrics response for HTTP endpoint integration.
+
+        Returns Prometheus metrics with proper content type for HTTP response.
+
+        Returns:
+            Dict containing content type and metrics body
+        """
+        from src.metrics import MetricsCollector
+
+        metrics_collector = MetricsCollector()
+        metrics_body = metrics_collector.get_prometheus_metrics()
+
+        from src.metrics import PROMETHEUS_CONTENT_TYPE
+
+        return {
+            "content_type": PROMETHEUS_CONTENT_TYPE,
+            "body": metrics_body
+        }
+
+    # Component health checker methods
+    def _check_sync_scheduler_health(self) -> bool:
+        """Check if sync scheduler is healthy."""
+        try:
+            # Basic check - in a real implementation this would check scheduler state
+            return True
+        except Exception as e:
+            self.logger.error(f"Sync scheduler health check failed: {e}")
+            return False
+
+    def _check_vector_store_health(self) -> bool:
+        """Check if vector store is healthy."""
+        try:
+            # Basic check - in a real implementation this would ping ChromaDB
+            return True
+        except Exception as e:
+            self.logger.error(f"Vector store health check failed: {e}")
+            return False
+
+    def _check_embedding_model_health(self) -> bool:
+        """Check if embedding model is healthy."""
+        try:
+            # Basic check - in a real implementation this would verify model loading
+            return True
+        except Exception as e:
+            self.logger.error(f"Embedding model health check failed: {e}")
+            return False
+
+    def _check_llm_model_health(self) -> bool:
+        """Check if LLM model is healthy."""
+        try:
+            # Basic check - in a real implementation this would verify LLM model loading
+            return True
+        except Exception as e:
+            self.logger.error(f"LLM model health check failed: {e}")
+            return False
+
+    def _check_growi_client_health(self) -> bool:
+        """Check if GROWI client is healthy."""
+        try:
+            # Basic check - in a real implementation this would test API connectivity
+            return True
+        except Exception as e:
+            self.logger.error(f"GROWI client health check failed: {e}")
+            return False

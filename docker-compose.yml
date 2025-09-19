@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  growi-rag-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: growi-rag-mcp
+    environment:
+      # GROWI API configuration
+      - GROWI_API_TOKEN=${GROWI_API_TOKEN:-}
+      - GROWI_API_URL=${GROWI_API_URL:-}
+      # Application configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MCP_PORT=${MCP_PORT:-3000}
+      # Security settings
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${MCP_PORT:-3000}:3000"
+    volumes:
+      # Configuration (read-only)
+      - ./config.yaml:/app/config.yaml:ro
+      # Models for local inference (read-only)
+      - ./models:/app/models:ro
+      # Persistent vector database
+      - growi_chroma_db:/app/chroma_db
+      # Optional: Mount custom configuration
+      - ${CUSTOM_CONFIG_PATH:-./config.yaml}:/app/config.yaml:ro
+    # Health check using built-in Docker health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT:-2G}
+          cpus: '${CPU_LIMIT:-2.0}'
+        reservations:
+          memory: ${MEMORY_RESERVATION:-512M}
+          cpus: '${CPU_RESERVATION:-0.5}'
+    # Restart policy for production reliability
+    restart: unless-stopped
+    # Logging configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Read-only root filesystem (except for required writable paths)
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    # Network configuration for production
+    networks:
+      - growi-rag-network
+
+# Named volumes for data persistence
+volumes:
+  growi_chroma_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${CHROMA_DB_PATH:-./chroma_db}
+
+# Network for service isolation
+networks:
+  growi-rag-network:
+    driver: bridge

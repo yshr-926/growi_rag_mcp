@@ -67,11 +67,11 @@ def _init_components() -> Tuple[Any, PlamoEmbeddingModel, ChromaVectorStore, str
     cfg = ConfigManager().load_config("config.yaml")
     base_url = cfg.growi.base_url
 
-    model = PlamoEmbeddingModel(model_path="./models/plamo-embedding-1b", device="auto")
+    model = PlamoEmbeddingModel(model_path=cfg.models.embedding.name, device=cfg.models.embedding.device)
     model.load()
 
     vector_store = ChromaVectorStore(
-        persist_directory="./data/chroma",
+        persist_directory=cfg.vector_db.persist_directory,
         collection_name="growi_chunks",
         distance="cosine",
     )
@@ -126,7 +126,7 @@ def handle_growi_retrieve(
     Embeds the query using PlamoEmbeddingModel and searches ChromaDB for
     semantically similar content chunks with configurable relevance thresholds.
     """
-    cfg, model, vector_store, base_url = _init_components()
+    _, model, vector_store, base_url = _init_components()
     try:
         results = _search_and_format(
             query=query, top_k=top_k, min_relevance=min_relevance,
@@ -160,9 +160,9 @@ class LocalLLM:
         query: str,
         contexts: List[Dict[str, Any]],
         lang: str = "ja",
-        max_new_tokens: int = 256,
-        temperature: float = 0.2,
-        seed: Optional[int] = None,
+        _max_new_tokens: int = 256,
+        _temperature: float = 0.2,
+        _seed: Optional[int] = None,
     ) -> str:
         if not self._loaded:
             raise RuntimeError("LocalLLM not loaded. Call load() first.")

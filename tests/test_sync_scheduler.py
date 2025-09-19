@@ -57,7 +57,7 @@ class FakeGrowiClient:
         self.raise_error = raise_error
         self.last_limit: int | None = None
 
-    def fetch_pages(self, limit: int = 1000) -> List[Dict[str, Any]]:  # pragma: no cover - exercised by scheduler
+    def fetch_pages(self, limit: int = 1000, updated_since: datetime | None = None) -> List[Dict[str, Any]]:  # pragma: no cover - exercised by scheduler
         self.last_limit = limit
         if self.raise_error:
             raise self.raise_error
