@@ -12,7 +12,7 @@ import pytest
 from datetime import datetime
 
 # Import the module to test - this will fail initially
-from src.logging_config import (
+from src.core.logging_config import (
     setup_logging,
     get_logger,
     JSONFormatter,

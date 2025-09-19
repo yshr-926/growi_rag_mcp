@@ -66,8 +66,8 @@ class TestChromaVectorStorePersistence:
     def records(self) -> List[Dict[str, Any]]:
         # Build a small set of chunks and embed locally via the provided pipeline/model
         try:
-            from src.embedding_model import PlamoEmbeddingModel  # type: ignore
-            from src.embedding_pipeline import generate_embeddings  # type: ignore
+            from src.embedding.model import PlamoEmbeddingModel  # type: ignore
+            from src.embedding.pipeline import generate_embeddings  # type: ignore
         except Exception as e:
             pytest.fail(f"Embedding pipeline or model missing for test setup: {e}")
 
@@ -93,7 +93,7 @@ class TestChromaVectorStorePersistence:
         Then a persistent collection is created and discoverable by a new client session.
         """
         try:
-            from src.vector_store import ChromaVectorStore  # type: ignore
+            from src.embedding.store import ChromaVectorStore  # type: ignore
         except Exception as e:
             pytest.fail(f"Missing src/vector_store.py with ChromaVectorStore: {e}")
 
@@ -124,7 +124,7 @@ class TestChromaVectorStorePersistence:
         Then Chroma persists vectors with page_id, chunk_id, and content metadata across sessions.
         """
         try:
-            from src.vector_store import ChromaVectorStore  # type: ignore
+            from src.embedding.store import ChromaVectorStore  # type: ignore
         except Exception as e:
             pytest.fail(f"Missing src/vector_store.py with ChromaVectorStore: {e}")
 

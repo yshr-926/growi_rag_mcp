@@ -41,7 +41,7 @@ class TestStandardizedErrorCodes:
         Then: Appropriate error codes are returned with context
         """
         # This test should FAIL until standardized error codes are implemented
-        from src.exceptions import ErrorCodes
+        from src.core.exceptions import ErrorCodes
 
         # Verify all required GROWI error codes exist
         assert hasattr(ErrorCodes, 'GROWI_CONNECTION_ERROR')
@@ -65,7 +65,7 @@ class TestStandardizedErrorCodes:
         Then: Appropriate error codes are returned
         """
         # This test should FAIL until vector store error codes are implemented
-        from src.exceptions import ErrorCodes
+        from src.core.exceptions import ErrorCodes
 
         assert hasattr(ErrorCodes, 'VECTOR_STORE_CONNECTION_ERROR')
         assert hasattr(ErrorCodes, 'VECTOR_STORE_INDEX_ERROR')
@@ -85,7 +85,7 @@ class TestStandardizedErrorCodes:
         Then: Appropriate error codes are returned
         """
         # This test should FAIL until LLM error codes are implemented
-        from src.exceptions import ErrorCodes
+        from src.core.exceptions import ErrorCodes
 
         assert hasattr(ErrorCodes, 'LLM_MODEL_LOADING_ERROR')
         assert hasattr(ErrorCodes, 'LLM_INFERENCE_ERROR')
@@ -106,7 +106,7 @@ class TestStandardizedErrorCodes:
         Then: Appropriate error codes are returned
         """
         # This test should FAIL until MCP error codes are implemented
-        from src.exceptions import ErrorCodes
+        from src.core.exceptions import ErrorCodes
 
         assert hasattr(ErrorCodes, 'MCP_TOOL_NOT_FOUND')
         assert hasattr(ErrorCodes, 'MCP_INVALID_PARAMETERS')
@@ -127,7 +127,7 @@ class TestStandardizedErrorCodes:
         Then: Appropriate error codes are returned
         """
         # This test should FAIL until validation error codes are implemented
-        from src.exceptions import ErrorCodes
+        from src.core.exceptions import ErrorCodes
 
         assert hasattr(ErrorCodes, 'VALIDATION_ERROR')
         assert hasattr(ErrorCodes, 'CONFIGURATION_ERROR')
@@ -147,7 +147,7 @@ class TestStandardizedErrorCodes:
         Then: Appropriate error codes are returned
         """
         # This test should FAIL until system error codes are implemented
-        from src.exceptions import ErrorCodes
+        from src.core.exceptions import ErrorCodes
 
         assert hasattr(ErrorCodes, 'INTERNAL_SERVER_ERROR')
         assert hasattr(ErrorCodes, 'SERVICE_UNAVAILABLE')
@@ -171,7 +171,7 @@ class TestEnhancedExceptionClasses:
         Then: Exceptions use correct standardized error codes
         """
         # This test should FAIL until enhanced exceptions are implemented
-        from src.exceptions import GROWIAPIError, ErrorCodes
+        from src.core.exceptions import GROWIAPIError, ErrorCodes
 
         # Test connection error
         conn_error = GROWIAPIError.connection_error(
@@ -207,7 +207,7 @@ class TestEnhancedExceptionClasses:
         Then: Exceptions use correct standardized error codes
         """
         # This test should FAIL until enhanced VectorStoreError is implemented
-        from src.exceptions import VectorStoreError, ErrorCodes
+        from src.core.exceptions import VectorStoreError, ErrorCodes
 
         # Test connection error
         conn_error = VectorStoreError.connection_error(
@@ -240,7 +240,7 @@ class TestEnhancedExceptionClasses:
         Then: Exceptions use correct standardized error codes
         """
         # This test should FAIL until enhanced LLMError is implemented
-        from src.exceptions import LLMError, ErrorCodes
+        from src.core.exceptions import LLMError, ErrorCodes
 
         # Test model loading error
         loading_error = LLMError.model_loading_error(
@@ -276,7 +276,7 @@ class TestEnhancedExceptionClasses:
         Then: Exceptions use correct standardized error codes
         """
         # This test should FAIL until MCPError class is implemented
-        from src.exceptions import MCPError, ErrorCodes
+        from src.core.exceptions import MCPError, ErrorCodes
 
         # Test tool not found error
         tool_error = MCPError.tool_not_found(
@@ -313,7 +313,7 @@ class TestMCPCompliantErrorResponses:
         Then: Error includes code, message, and details per spec
         """
         # This test should FAIL until MCP-compliant error formatting is implemented
-        from src.exceptions import GROWIAPIError, format_mcp_error_response
+        from src.core.exceptions import GROWIAPIError, format_mcp_error_response
 
         error = GROWIAPIError.authentication_error(
             message="API token expired"
@@ -341,7 +341,7 @@ class TestMCPCompliantErrorResponses:
         Then: Context details are preserved in the response
         """
         # This test should FAIL until context preservation is implemented
-        from src.exceptions import VectorStoreError, format_mcp_error_response
+        from src.core.exceptions import VectorStoreError, format_mcp_error_response
 
         error = VectorStoreError.query_error(
             query_text="test search query",
@@ -373,7 +373,7 @@ class TestMCPCompliantErrorResponses:
         Then: Nested error information is included
         """
         # This test should FAIL until nested error handling is implemented
-        from src.exceptions import LLMError, format_mcp_error_response
+        from src.core.exceptions import LLMError, format_mcp_error_response
 
         # Create nested error chain
         root_cause = Exception("GPU memory allocation failed")
@@ -401,7 +401,7 @@ class TestMCPCompliantErrorResponses:
         Then: Correct HTTP status codes are returned
         """
         # This test should FAIL until HTTP status mapping is implemented
-        from src.exceptions import ErrorCodes, get_http_status_for_error_code
+        from src.core.exceptions import ErrorCodes, get_http_status_for_error_code
 
         # Test mapping of various error codes
         assert get_http_status_for_error_code(ErrorCodes.GROWI_AUTH_ERROR) == 401
@@ -421,7 +421,7 @@ class TestMCPCompliantErrorResponses:
         Then: Correct categories are returned
         """
         # This test should FAIL until error categorization is implemented
-        from src.exceptions import ErrorCodes, get_error_category
+        from src.core.exceptions import ErrorCodes, get_error_category
 
         # Test categorization
         assert get_error_category(ErrorCodes.GROWI_CONNECTION_ERROR) == "network"

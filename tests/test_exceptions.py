@@ -16,7 +16,7 @@ from typing import Dict, Any
 
 # Import the modules to test - these will fail initially during RED phase
 try:
-    from src.exceptions import (
+    from src.core.exceptions import (
         BaseAPIError,
         GROWIAPIError,
         VectorStoreError,
@@ -29,11 +29,12 @@ try:
         generate_request_id,
         format_error_response
     )
-    from src.middleware import (
-        ErrorHandlerMiddleware,
-        RequestContextMiddleware,
-        request_context
-    )
+    # Middleware removed as part of restructuring
+    # from src.middleware import (
+    #     ErrorHandlerMiddleware,
+    #     RequestContextMiddleware,
+    #     request_context
+    # )
 except ImportError:
     # Expected during RED phase - modules don't exist yet
     pass
@@ -282,116 +283,119 @@ class TestErrorResponseFormatting:
         assert response.error_code == "OVERRIDE_TEST"
 
 
-class TestMiddleware:
-    """Test error handling middleware."""
-
-    def test_error_handler_middleware_initialization(self):
-        """Test ErrorHandlerMiddleware initialization."""
-        # This will fail because ErrorHandlerMiddleware doesn't exist yet
-        middleware = ErrorHandlerMiddleware()
-
-        assert middleware is not None
-        assert hasattr(middleware, 'process_error')
-
-    def test_request_context_middleware_initialization(self):
-        """Test RequestContextMiddleware initialization."""
-        middleware = RequestContextMiddleware()
-
-        assert middleware is not None
-        assert hasattr(middleware, 'set_request_id')
-
-    def test_error_handler_middleware_logs_errors(self):
-        """Test that error handler middleware logs errors properly."""
-        mock_logger = Mock()
-
-        # Directly pass mock logger to middleware
-        middleware = ErrorHandlerMiddleware(logger=mock_logger)
-
-        error = GROWIAPIError(
-            message="Test middleware error",
-            endpoint="/api/v3/test",
-            status_code=500,
-            request_id="middleware-test-123"
-        )
-
-        response = middleware.process_error(error)
-
-        # Verify logging was called
-        mock_logger.error.assert_called_once()
-
-        # Verify response structure
-        assert isinstance(response, dict)
-        assert response["error_code"] == "GROWI_API_ERROR"
-        assert response["request_id"] == "middleware-test-123"
-
-    def test_request_context_provides_request_id(self):
-        """Test that request context provides request ID."""
-        # This will fail because request_context doesn't exist yet
-        with request_context() as ctx:
-            assert ctx.request_id is not None
-            assert ctx.request_id.startswith("req-")
-
-    def test_request_context_custom_request_id(self):
-        """Test request context with custom request ID."""
-        custom_id = "custom-request-id"
-
-        with request_context(request_id=custom_id) as ctx:
-            assert ctx.request_id == custom_id
+# TestMiddleware class removed due to middleware.py deletion in restructuring
+# class TestMiddleware:
+#     """Test error handling middleware."""
+#
+#     def test_error_handler_middleware_initialization(self):
+#         """Test ErrorHandlerMiddleware initialization."""
+#         # This will fail because ErrorHandlerMiddleware doesn't exist yet
+#         middleware = ErrorHandlerMiddleware()
+#
+#         assert middleware is not None
+#         assert hasattr(middleware, 'process_error')
+#
+#     def test_request_context_middleware_initialization(self):
+#         """Test RequestContextMiddleware initialization."""
+#         middleware = RequestContextMiddleware()
+#
+#         assert middleware is not None
+#         assert hasattr(middleware, 'set_request_id')
+#
+#     def test_error_handler_middleware_logs_errors(self):
+#         """Test that error handler middleware logs errors properly."""
+#         mock_logger = Mock()
+#
+#         # Directly pass mock logger to middleware
+#         middleware = ErrorHandlerMiddleware(logger=mock_logger)
+#
+#         error = GROWIAPIError(
+#             message="Test middleware error",
+#             endpoint="/api/v3/test",
+#             status_code=500,
+#             request_id="middleware-test-123"
+#         )
+#
+#         response = middleware.process_error(error)
+#
+#         # Verify logging was called
+#         mock_logger.error.assert_called_once()
+#
+#         # Verify response structure
+#         assert isinstance(response, dict)
+#         assert response["error_code"] == "GROWI_API_ERROR"
+#         assert response["request_id"] == "middleware-test-123"
+#
+#     def test_request_context_provides_request_id(self):
+#         """Test that request context provides request ID."""
+#         # This will fail because request_context doesn't exist yet
+#         with request_context() as ctx:
+#             assert ctx.request_id is not None
+#             assert ctx.request_id.startswith("req-")
+#
+#     def test_request_context_custom_request_id(self):
+#         """Test request context with custom request ID."""
+#         custom_id = "custom-request-id"
+#
+#         with request_context(request_id=custom_id) as ctx:
+#             assert ctx.request_id == custom_id
 
 
 class TestLoggingIntegration:
     """Test integration with existing logging system."""
 
-    def test_error_logging_includes_request_context(self):
-        """Test that error logging includes request context."""
-        mock_logger = Mock()
+    # Middleware tests removed due to restructuring
+    # def test_error_logging_includes_request_context(self):
+    #     """Test that error logging includes request context."""
+    #     mock_logger = Mock()
+    #
+    #     request_id = "logging-test-456"
+    #
+    #     error = VectorStoreError(
+    #         message="Logging integration test",
+    #         operation="test_operation",
+    #         collection="test_collection",
+    #         request_id=request_id
+    #     )
+    #
+    #     # Simulate middleware processing
+    #     middleware = ErrorHandlerMiddleware(logger=mock_logger)
+    #     middleware.process_error(error)
+    #
+    #     # Verify logger was called with proper context
+    #     mock_logger.error.assert_called_once()
+    #     call_args = mock_logger.error.call_args
+    #
+    #     # Check that extra context includes error details
+    #     extra = call_args.kwargs.get('extra', {})
+    #     assert extra.get('request_id') == request_id
+    #     assert extra.get('error_code') == "VECTOR_STORE_ERROR"
+    #     assert extra.get('operation') == "test_operation"
 
-        request_id = "logging-test-456"
-
-        error = VectorStoreError(
-            message="Logging integration test",
-            operation="test_operation",
-            collection="test_collection",
-            request_id=request_id
-        )
-
-        # Simulate middleware processing
-        middleware = ErrorHandlerMiddleware(logger=mock_logger)
-        middleware.process_error(error)
-
-        # Verify logger was called with proper context
-        mock_logger.error.assert_called_once()
-        call_args = mock_logger.error.call_args
-
-        # Check that extra context includes error details
-        extra = call_args.kwargs.get('extra', {})
-        assert extra.get('request_id') == request_id
-        assert extra.get('error_code') == "VECTOR_STORE_ERROR"
-        assert extra.get('operation') == "test_operation"
-
-    def test_performance_logging_on_error(self):
-        """Test that error handling includes performance metrics."""
-        mock_logger = Mock()
-
-        error = LLMError(
-            message="Performance test error",
-            model="test-model",
-            operation="test-operation",
-            request_id="perf-test-789"
-        )
-
-        middleware = ErrorHandlerMiddleware(logger=mock_logger)
-
-        with patch('time.perf_counter', side_effect=[0.0, 0.142]):  # 142ms duration
-            middleware.process_error(error)
-
-        # Verify performance metrics are logged
-        mock_logger.error.assert_called_once()
-        call_args = mock_logger.error.call_args
-        extra = call_args.kwargs.get('extra', {})
-
-        # Should include timing information
-        assert 'duration_ms' in extra or 'latency_ms' in extra
+    # Middleware performance tests removed due to restructuring
+    # def test_performance_logging_on_error(self):
+    #     """Test that error handling includes performance metrics."""
+    #     mock_logger = Mock()
+    #
+    #     error = LLMError(
+    #         message="Performance test error",
+    #         model="test-model",
+    #         operation="test-operation",
+    #         request_id="perf-test-789"
+    #     )
+    #
+    #     middleware = ErrorHandlerMiddleware(logger=mock_logger)
+    #
+    #     with patch('time.perf_counter', side_effect=[0.0, 0.142]):  # 142ms duration
+    #         middleware.process_error(error)
+    #
+    #     # Verify performance metrics are logged
+    #     mock_logger.error.assert_called_once()
+    #     call_args = mock_logger.error.call_args
+    #     extra = call_args.kwargs.get('extra', {})
+    #
+    #     # Should include timing information
+    #     assert 'duration_ms' in extra or 'latency_ms' in extra
 
 
 class TestErrorHandlingEdgeCases:
@@ -431,16 +435,17 @@ class TestErrorHandlingEdgeCases:
         # Should handle circular reference gracefully
         assert "details" in response_dict
 
-    def test_middleware_handles_unexpected_exception_types(self):
-        """Test middleware handling of unexpected exception types."""
-        middleware = ErrorHandlerMiddleware()
-
-        # Test with built-in exception
-        runtime_error = RuntimeError("Unexpected runtime error")
-        response = middleware.process_error(runtime_error)
-
-        assert response["error_code"] == "INTERNAL_SERVER_ERROR"
-        assert "Unexpected runtime error" in response["message"]
+    # Middleware exception handling tests removed due to restructuring
+    # def test_middleware_handles_unexpected_exception_types(self):
+    #     """Test middleware handling of unexpected exception types."""
+    #     middleware = ErrorHandlerMiddleware()
+    #
+    #     # Test with built-in exception
+    #     runtime_error = RuntimeError("Unexpected runtime error")
+    #     response = middleware.process_error(runtime_error)
+    #
+    #     assert response["error_code"] == "INTERNAL_SERVER_ERROR"
+    #     assert "Unexpected runtime error" in response["message"]
 
     def test_extremely_long_error_message_truncation(self):
         """Test handling of extremely long error messages."""

@@ -60,7 +60,7 @@ class TestEmbeddingPipeline:
 
     @pytest.fixture
     def model(self):
-        from src.embedding_model import PlamoEmbeddingModel  # type: ignore
+        from src.embedding.model import PlamoEmbeddingModel  # type: ignore
 
         # Use non-model path to avoid FileNotFoundError in development
         m = PlamoEmbeddingModel(model_path="/tmp/test-pipeline", device="auto")
@@ -74,7 +74,7 @@ class TestEmbeddingPipeline:
         Then each chunk gets a corresponding embedding vector with metadata.
         """
         try:
-            from src.embedding_pipeline import generate_embeddings  # type: ignore
+            from src.embedding.pipeline import generate_embeddings  # type: ignore
         except Exception as e:  # Make RED an assertion failure, not ImportError error
             pytest.fail(f"Missing src/embedding_pipeline.py with generate_embeddings(): {e}")
 
@@ -113,7 +113,7 @@ class TestEmbeddingPipeline:
         Then processing completes within reasonable time with progress logging.
         """
         try:
-            from src.embedding_pipeline import generate_embeddings  # type: ignore
+            from src.embedding.pipeline import generate_embeddings  # type: ignore
         except Exception as e:
             pytest.fail(f"Missing src/embedding_pipeline.py with generate_embeddings(): {e}")
 

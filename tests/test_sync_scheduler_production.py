@@ -104,7 +104,7 @@ class TestProductionSyncScheduler:
 
         Expected FAILURE: Current implementation requires manual sync trigger
         """
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         caplog.set_level(logging.INFO, logger="growi.sync_scheduler")
 
@@ -154,7 +154,7 @@ class TestProductionSyncScheduler:
 
         Expected FAILURE: Current implementation has no persistence
         """
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         # Setup state file
         state_file = tmp_path / "sync_state.json"
@@ -217,7 +217,7 @@ class TestProductionSyncScheduler:
 
         Expected FAILURE: Current implementation has no background task execution
         """
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         caplog.set_level(logging.INFO, logger="growi.sync_scheduler")
 
@@ -269,7 +269,7 @@ class TestProductionSyncScheduler:
 
         Expected FAILURE: Current implementation only counts processed pages
         """
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         class PipelineProcessor(MockProcessor):
             def __init__(self):
@@ -327,7 +327,7 @@ class TestProductionSyncScheduler:
 
         Expected FAILURE: Current implementation has no background tasks to shutdown
         """
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         client = MockGROWIClient(pages=[])
         processor = MockProcessor()

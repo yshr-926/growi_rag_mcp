@@ -85,7 +85,7 @@ class TestSyncSchedulerActualAPI:
         Then: Performs full sync of all public pages from GROWI
         """
         # This test should FAIL until actual API integration is implemented
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         # Mock pages from GROWI API
         mock_pages = [
@@ -155,7 +155,7 @@ class TestSyncSchedulerActualAPI:
         Then: Fetches only pages with updated_at > last_sync_time
         """
         # This test should FAIL until actual API integration is implemented
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         # Mock pages - some old, some new
         base_time = datetime(2025, 9, 17, 10, 0, 0, tzinfo=timezone.utc)
@@ -228,7 +228,7 @@ class TestSyncSchedulerActualAPI:
         Then: No pages are processed but sync completes successfully
         """
         # This test should FAIL until actual API integration is implemented
-        from src.sync_scheduler import SyncScheduler
+        from src.growi.sync_scheduler import SyncScheduler
 
         last_sync_time = datetime(2025, 9, 17, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -269,7 +269,7 @@ class TestSyncSchedulerActualAPI:
         Should FAIL until T023 GROWI API integration is implemented.
         """
         # This test should FAIL until actual API client supports updated_since
-        from src.growi_client import GROWIClient
+        from src.growi.client import GROWIClient
         import inspect
 
         # Check that fetch_pages method signature supports updated_since parameter
@@ -294,7 +294,7 @@ class TestSyncSchedulerActualAPI:
         Should FAIL until integration is complete.
         """
         # This test should FAIL until actual integration is implemented
-        with patch('src.growi_client.GROWIClient') as MockClient:
+        with patch('src.growi.client.GROWIClient') as MockClient:
             mock_instance = Mock()
             MockClient.return_value = mock_instance
 
@@ -313,7 +313,7 @@ class TestSyncSchedulerActualAPI:
                 }
             ]
 
-            from src.sync_scheduler import SyncScheduler
+            from src.growi.sync_scheduler import SyncScheduler
 
             # Create scheduler with mocked client
             processor = MockProcessor()

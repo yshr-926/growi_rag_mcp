@@ -47,7 +47,7 @@ class TestPlamoEmbeddingModel:
         Then it loads successfully and reports ready status.
         """
         # Import here to keep collection robust during RED phase
-        from src.embedding_model import PlamoEmbeddingModel  # type: ignore
+        from src.embedding.model import PlamoEmbeddingModel  # type: ignore
 
         # Use non-model path to test fallback behavior
         test_path = "/tmp/test-ready"
@@ -63,7 +63,7 @@ class TestPlamoEmbeddingModel:
         When generate embedding is called,
         Then returns numpy array of expected dimensions (2048 for plamo-1b).
         """
-        from src.embedding_model import PlamoEmbeddingModel  # type: ignore
+        from src.embedding.model import PlamoEmbeddingModel  # type: ignore
 
         # Use non-model path to test fallback behavior
         test_path = "/tmp/test-embed"
@@ -87,7 +87,7 @@ class TestPlamoEmbeddingModel:
         When model is loaded,
         Then Transformers library loads model weights successfully.
         """
-        from src.embedding_model import PlamoEmbeddingModel, HAS_TRANSFORMERS  # type: ignore
+        from src.embedding.model import PlamoEmbeddingModel, HAS_TRANSFORMERS  # type: ignore
 
         # T025 requirement: Test that transformers library integration is available
         assert HAS_TRANSFORMERS, "Transformers library should be available for T025"
@@ -117,7 +117,7 @@ class TestPlamoEmbeddingModel:
         When encode_query or encode_document is called,
         Then returns proper 2048-dimensional L2-normalized embeddings.
         """
-        from src.embedding_model import PlamoEmbeddingModel, HAS_TRANSFORMERS  # type: ignore
+        from src.embedding.model import PlamoEmbeddingModel, HAS_TRANSFORMERS  # type: ignore
 
         # Use non-model path to avoid FileNotFoundError in development
         test_model_path = "/tmp/test-embedding-query"
@@ -146,7 +146,7 @@ class TestPlamoEmbeddingModel:
         When model load is attempted,
         Then appropriate error is raised.
         """
-        from src.embedding_model import PlamoEmbeddingModel  # type: ignore
+        from src.embedding.model import PlamoEmbeddingModel  # type: ignore
 
         # Use a non-existent path
         invalid_path = str(tmp_path / "nonexistent_model")

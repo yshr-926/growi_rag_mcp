@@ -76,7 +76,7 @@ class TestGROWIClientAuthentication:
         base_url, recorder, expected_token = auth_test_server
 
         # Import deferred so the test fails red if client is missing
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token=expected_token)
         resp = client.get("/ok")
@@ -89,8 +89,8 @@ class TestGROWIClientAuthentication:
     def test_invalid_token_raises_authentication_error(self, auth_test_server):
         base_url, _recorder, _expected_token = auth_test_server
 
-        from src.exceptions import AuthenticationError  # noqa: WPS433
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.core.exceptions import AuthenticationError  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token="invalid-token-xyz")
 
@@ -105,8 +105,8 @@ class TestGROWIClientAuthentication:
         """Test that 403 Forbidden responses also raise AuthenticationError"""
         base_url, _recorder, _expected_token = auth_test_server
 
-        from src.exceptions import AuthenticationError  # noqa: WPS433
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.core.exceptions import AuthenticationError  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token="forbidden-token")
 

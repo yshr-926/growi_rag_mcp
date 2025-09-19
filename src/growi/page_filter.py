@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Protocol, runtime_checkable
 
-from src.logging_config import get_logger
+from src.core.logging_config import get_logger
 
 
 _LOGGER = get_logger("growi.page_filter")

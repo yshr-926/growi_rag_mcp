@@ -83,7 +83,7 @@ class TestGROWIClientAuthV3:
         base_url, recorder, expected_token = v3_auth_test_server
 
         # Import deferred so the test fails red if client is missing or API not implemented
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token=expected_token)
 
@@ -102,8 +102,8 @@ class TestGROWIClientAuthV3:
         """Given invalid token, client must raise AuthenticationError with clear message."""
         base_url, _recorder, _expected_token = v3_auth_test_server
 
-        from src.exceptions import AuthenticationError  # noqa: WPS433
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.core.exceptions import AuthenticationError  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token="totally-invalid-token")
 

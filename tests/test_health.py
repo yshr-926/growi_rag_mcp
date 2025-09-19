@@ -11,7 +11,7 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch, MagicMock
 
-from src.health import HealthChecker, HealthService
+from src.monitoring.health import HealthChecker, HealthService
 
 
 class TestHealthChecker:
@@ -238,7 +238,7 @@ class TestHealthIntegration:
         mock_config = Mock()
         mock_config.mcp.version = "1.0.0"
 
-        with patch('src.health.get_logger') as mock_get_logger:
+        with patch('src.monitoring.health.get_logger') as mock_get_logger:
             mock_logger = Mock()
             mock_get_logger.return_value = mock_logger
 
@@ -252,7 +252,7 @@ class TestHealthIntegration:
         mock_config = Mock()
         mock_config.mcp.version = "1.0.0"
 
-        with patch('src.health.get_logger') as mock_get_logger:
+        with patch('src.monitoring.health.get_logger') as mock_get_logger:
             mock_logger = Mock()
             mock_get_logger.return_value = mock_logger
 

@@ -30,7 +30,7 @@ import numpy as np
 import pytest
 
 from src.mcp_handlers import tools as tools_module
-from src.vector_store import ChromaVectorStore
+from src.embedding.store import ChromaVectorStore
 
 
 @pytest.fixture

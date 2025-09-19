@@ -49,7 +49,7 @@ class TestPageFilter:
         then only pages with grant=1 (public) are processed and stored.
         """
         # Deferred import so test fails RED if page_filter is missing/incomplete
-        from src.page_filter import filter_and_store_pages  # noqa: WPS433
+        from src.growi.page_filter import filter_and_store_pages  # noqa: WPS433
 
         pages = [
             _make_raw_page("p1", 1),
@@ -79,7 +79,7 @@ class TestPageFilter:
         when validation runs,
         then page is rejected with appropriate warning log.
         """
-        from src.page_filter import filter_and_store_pages  # noqa: WPS433
+        from src.growi.page_filter import filter_and_store_pages  # noqa: WPS433
 
         valid = _make_raw_page("ok1", 1)
         missing_grant = _make_raw_page("nogrant", None)  # grant intentionally omitted
@@ -103,7 +103,7 @@ class TestPageFilter:
         when processing runs,
         then the page is processed (normalized) and saved to the store.
         """
-        from src.page_filter import filter_and_store_pages  # noqa: WPS433
+        from src.growi.page_filter import filter_and_store_pages  # noqa: WPS433
 
         page = _make_raw_page("pub-1", 1, title="Public", path="/public", body="Hello")
         store = FakeStore()
@@ -132,7 +132,7 @@ class TestPageFilter:
         when validation runs,
         then the page is rejected and a warning is logged.
         """
-        from src.page_filter import filter_and_store_pages  # noqa: WPS433
+        from src.growi.page_filter import filter_and_store_pages  # noqa: WPS433
 
         page = _make_raw_page("weird", bad_grant)
         store = FakeStore()

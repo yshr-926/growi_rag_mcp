@@ -83,7 +83,7 @@ class TestSyncScheduler:
         then it holds a 12-hour interval and sets the first next_run timestamp.
         """
         # Deferred import for RED phase
-        from src.sync_scheduler import SyncScheduler  # noqa: WPS433
+        from src.growi.sync_scheduler import SyncScheduler  # noqa: WPS433
 
         client = FakeGrowiClient([])
         processor = FakeProcessor()
@@ -111,7 +111,7 @@ class TestSyncScheduler:
         then only pages with revision.updatedAt > last_synced_at are processed (grant=1 only),
         and the client is called with the 1000-page development cap.
         """
-        from src.sync_scheduler import SyncScheduler  # noqa: WPS433
+        from src.growi.sync_scheduler import SyncScheduler  # noqa: WPS433
 
         pages = [
             _page("p-old", "2025-01-01T00:00:00.000Z"),
@@ -146,7 +146,7 @@ class TestSyncScheduler:
         when another sync is requested,
         then the scheduler skips the duplicate and logs an informative message.
         """
-        from src.sync_scheduler import SyncScheduler  # noqa: WPS433
+        from src.growi.sync_scheduler import SyncScheduler  # noqa: WPS433
 
         client = FakeGrowiClient([])
         processor = FakeProcessor()
@@ -170,7 +170,7 @@ class TestSyncScheduler:
         when it completes,
         then the next_run_at is scheduled approximately interval_hours into the future.
         """
-        from src.sync_scheduler import SyncScheduler  # noqa: WPS433
+        from src.growi.sync_scheduler import SyncScheduler  # noqa: WPS433
 
         pages = [
             _page("p1", "2025-01-10T00:00:00.000Z"),
@@ -193,8 +193,8 @@ class TestSyncScheduler:
         when run_sync_now is executed,
         then the scheduler logs an error, resets in-progress state, and schedules the next run.
         """
-        from src.sync_scheduler import SyncScheduler  # noqa: WPS433
-        from src.exceptions import GROWIAPIError  # noqa: WPS433
+        from src.growi.sync_scheduler import SyncScheduler  # noqa: WPS433
+        from src.core.exceptions import GROWIAPIError  # noqa: WPS433
 
         err = GROWIAPIError(message="boom", endpoint="/api/v3/pages", status_code=503)
         client = FakeGrowiClient(raise_error=err)

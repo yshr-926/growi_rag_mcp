@@ -19,7 +19,7 @@ import os
 import numpy as np
 import pytest
 
-from src.embedding_model import HAS_TRANSFORMERS, PlamoEmbeddingModel
+from src.embedding.model import HAS_TRANSFORMERS, PlamoEmbeddingModel
 
 MODEL_ID = "pfnet/plamo-embedding-1b"
 EXPECTED_DIM = 2048

@@ -162,7 +162,7 @@ class TestGROWIPagesPagination:
         base_url, recorder, expected_token, dataset = pagination_test_server
 
         # Deferred import so this test fails red if method not implemented
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token=expected_token)
 
@@ -191,7 +191,7 @@ class TestGROWIPagesPagination:
         """
         base_url, _recorder, expected_token, _dataset = pagination_test_server
 
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token=expected_token)
         pages = client.fetch_pages(limit=25)
@@ -211,7 +211,7 @@ class TestGROWIPagesPagination:
         # This test is modified to verify basic pagination functionality
         base_url, recorder, expected_token, _dataset = pagination_test_server
 
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token=expected_token)
         pages = client.fetch_pages(limit=15)
@@ -223,7 +223,7 @@ class TestGROWIPagesPagination:
     def test_fetch_pages_returns_tags_and_created_user_fields(self, pagination_test_server):
         base_url, _recorder, expected_token, _dataset = pagination_test_server
 
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         client = GROWIClient(base_url=base_url, token=expected_token)
         pages = client.fetch_pages(limit=10)

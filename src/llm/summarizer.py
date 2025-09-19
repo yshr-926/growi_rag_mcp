@@ -4,8 +4,8 @@ import hashlib
 import logging
 from typing import Any, Mapping, Sequence
 
-from src.config import SummarizerConfig
-from src.exceptions import LLMError
+from src.core.config import SummarizerConfig
+from src.core.exceptions import LLMError
 
 try:  # pragma: no cover - dependency availability checked at runtime
     from openai import OpenAI  # type: ignore

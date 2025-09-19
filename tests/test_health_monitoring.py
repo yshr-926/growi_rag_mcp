@@ -42,7 +42,7 @@ class TestHealthzEndpoint:
         Then: Returns health status with component checks
         """
         # This test should FAIL until /healthz endpoint is implemented
-        from src.health import HealthService
+        from src.monitoring.health import HealthService
 
         # Mock config for health service
         mock_config = Mock()
@@ -83,7 +83,7 @@ class TestHealthzEndpoint:
         Then: Status values are correctly reported
         """
         # This test should FAIL until component health logic is implemented
-        from src.health import HealthService
+        from src.monitoring.health import HealthService
 
         mock_config = Mock()
         health_service = HealthService(mock_config)
@@ -118,7 +118,7 @@ class TestHealthzEndpoint:
         Then: Response time is under acceptable threshold
         """
         # This test should FAIL until /healthz endpoint is implemented efficiently
-        from src.health import HealthService
+        from src.monitoring.health import HealthService
 
         mock_config = Mock()
         health_service = HealthService(mock_config)
@@ -147,7 +147,7 @@ class TestPrometheusMetrics:
         Then: Returns properly formatted Prometheus metrics
         """
         # This test should FAIL until MetricsCollector is implemented
-        from src.metrics import MetricsCollector
+        from src.monitoring.metrics import MetricsCollector
 
         metrics_collector = MetricsCollector()
 
@@ -174,7 +174,7 @@ class TestPrometheusMetrics:
         Then: Latency metrics are recorded
         """
         # This test should FAIL until metrics collection is implemented
-        from src.metrics import MetricsCollector
+        from src.monitoring.metrics import MetricsCollector
 
         metrics_collector = MetricsCollector()
 
@@ -204,7 +204,7 @@ class TestPrometheusMetrics:
         Then: Performance metrics are recorded
         """
         # This test should FAIL until vector search metrics are implemented
-        from src.metrics import MetricsCollector
+        from src.monitoring.metrics import MetricsCollector
 
         metrics_collector = MetricsCollector()
 
@@ -228,7 +228,7 @@ class TestPrometheusMetrics:
         Then: Sync metrics are updated
         """
         # This test should FAIL until sync metrics are implemented
-        from src.metrics import MetricsCollector
+        from src.monitoring.metrics import MetricsCollector
 
         metrics_collector = MetricsCollector()
 
@@ -261,7 +261,7 @@ class TestPrometheusMetrics:
         Then: Error metrics are recorded with proper labels
         """
         # This test should FAIL until error metrics are implemented
-        from src.metrics import MetricsCollector
+        from src.monitoring.metrics import MetricsCollector
 
         metrics_collector = MetricsCollector()
 
@@ -287,7 +287,7 @@ class TestPrometheusMetrics:
         Then: Returns Prometheus metrics with proper content type
         """
         # This test should FAIL until HTTP metrics endpoint is implemented
-        from src.health import HealthService
+        from src.monitoring.health import HealthService
 
         mock_config = Mock()
         health_service = HealthService(mock_config)
