@@ -24,7 +24,7 @@ Error Categories:
 - InternalServerError: Unexpected server-side errors
 
 Example usage:
-    from exceptions import GROWIAPIError, format_error_response, ErrorSeverity
+    from src.exceptions import GROWIAPIError, format_error_response, ErrorSeverity
 
     try:
         # GROWI API call that fails

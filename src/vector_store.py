@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import chromadb
 import json
 
-from .exceptions import VectorStoreError
+from src.exceptions import VectorStoreError
 
 
 _DISTANCE_TO_SPACE = {

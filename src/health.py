@@ -13,8 +13,8 @@ Key features:
 - JSON-structured response format
 
 Example usage:
-    from health import HealthService
-    from config import ConfigManager
+    from src.health import HealthService
+    from src.config import ConfigManager
 
     config = ConfigManager().load_config("config.yaml")
     health_service = HealthService(config)
@@ -229,7 +229,8 @@ class HealthChecker:
             return True
         except Exception as e:
             # Fallback logging since regular logging might not work
-            print(f"Logging system check failed: {e}")
+            import logging
+            logging.getLogger("growi_rag_mcp.health").error(f"Logging system check failed: {e}")
             return False
 
     def _check_vector_store_ready(self) -> bool:

@@ -14,7 +14,7 @@ Key features:
 - Integration with project configuration system
 
 Example usage:
-    from logging_config import setup_logging, get_logger, LogLevel
+    from src.logging_config import setup_logging, get_logger, LogLevel
 
     setup_logging(level=LogLevel.INFO)
     logger = get_logger("growi.client")

@@ -25,7 +25,7 @@ Architecture:
 - ErrorSanitizer: Security-focused error message filtering
 
 Example usage:
-    from middleware import ErrorHandlerMiddleware, request_context, ErrorSanitizer
+    from src.middleware import ErrorHandlerMiddleware, request_context, ErrorSanitizer
 
     # Basic usage
     middleware = ErrorHandlerMiddleware(
