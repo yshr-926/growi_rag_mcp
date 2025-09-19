@@ -29,7 +29,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from src.mcp import tools as tools_module
+from src.mcp_handlers import tools as tools_module
 from src.vector_store import ChromaVectorStore
 
 
@@ -48,12 +48,12 @@ def collection_name():
 def embedding_records_rag() -> List[Dict[str, Any]]:
     """Two public pages with one chunk each, including realistic metadata.
 
-    Using 1024-dim vectors to mirror plamo-embedding shape from other tests.
+    Using 2048-dim vectors to mirror plamo-embedding shape from other tests.
     """
     return [
         {
             "chunk_id": "docker#0",
-            "embedding": np.random.rand(1024).astype(np.float32),
+            "embedding": np.random.rand(2048).astype(np.float32),
             "metadata": {
                 "page_id": "docker",
                 "chunk_index": 0,
@@ -70,7 +70,7 @@ def embedding_records_rag() -> List[Dict[str, Any]]:
         },
         {
             "chunk_id": "growi#0",
-            "embedding": np.random.rand(1024).astype(np.float32),
+            "embedding": np.random.rand(2048).astype(np.float32),
             "metadata": {
                 "page_id": "growi",
                 "chunk_index": 0,
@@ -164,10 +164,10 @@ class TestGROWIRagSearchIntegration:
                 )
 
         # Apply patches into tools module
-        monkeypatch.setattr("src.mcp.tools.PlamoEmbeddingModel", mock_plamo_model)
-        monkeypatch.setattr("src.mcp.tools.ConfigManager", mock_config_manager)
-        monkeypatch.setattr("src.mcp.tools.ChromaVectorStore", lambda **kwargs: vector_store)
-        monkeypatch.setattr("src.mcp.tools.LocalLLM", FakeLocalLLM)
+        monkeypatch.setattr("src.mcp_handlers.tools.PlamoEmbeddingModel", mock_plamo_model)
+        monkeypatch.setattr("src.mcp_handlers.tools.ConfigManager", mock_config_manager)
+        monkeypatch.setattr("src.mcp_handlers.tools.ChromaVectorStore", lambda **kwargs: vector_store)
+        monkeypatch.setattr("src.mcp_handlers.tools.LocalLLM", FakeLocalLLM)
 
         # Act: call the RAG search handler
         out = tools_module.handle_growi_rag_search(
@@ -243,10 +243,10 @@ class TestGROWIRagSearchIntegration:
                 raise RuntimeError("LLM generation failed")
 
         # Patch tools
-        monkeypatch.setattr("src.mcp.tools.PlamoEmbeddingModel", mock_plamo_model)
-        monkeypatch.setattr("src.mcp.tools.ConfigManager", mock_config_manager)
-        monkeypatch.setattr("src.mcp.tools.ChromaVectorStore", lambda **kwargs: vector_store)
-        monkeypatch.setattr("src.mcp.tools.LocalLLM", FailingLocalLLM)
+        monkeypatch.setattr("src.mcp_handlers.tools.PlamoEmbeddingModel", mock_plamo_model)
+        monkeypatch.setattr("src.mcp_handlers.tools.ConfigManager", mock_config_manager)
+        monkeypatch.setattr("src.mcp_handlers.tools.ChromaVectorStore", lambda **kwargs: vector_store)
+        monkeypatch.setattr("src.mcp_handlers.tools.LocalLLM", FailingLocalLLM)
 
         # Act
         out = tools_module.handle_growi_rag_search(

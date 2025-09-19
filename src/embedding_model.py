@@ -36,9 +36,9 @@ except ImportError:
     F = None  # type: ignore
 
 # Constants kept close to the spec and tests
-DEFAULT_EMBEDDING_DIM = 1024  # plamo-embedding-1b emits 1024-d vectors per spec
+DEFAULT_EMBEDDING_DIM = 2048  # plamo-embedding-1b emits 2048-d vectors per spec
 DEFAULT_DTYPE = np.float32
-MAX_TOKEN_LENGTH = 1024  # Spec: soft limit approx 1024 tokens
+MAX_TOKEN_LENGTH = 4096  # Spec: plamo-embedding-1b supports up to 4096 tokens
 MODEL_ID = "pfnet/plamo-embedding-1b"
 
 
