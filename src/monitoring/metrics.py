@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 from threading import Lock
 import logging
 
-from src.logging_config import get_logger
+from src.core.logging_config import get_logger
 
 # Prometheus format constants
 PROMETHEUS_VERSION = "0.0.4"

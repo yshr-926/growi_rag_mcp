@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import patch, mock_open
 
 # This import will fail initially since config.py doesn't exist yet (RED phase)
-from src.config import ConfigManager, Config
+from src.core.config import ConfigManager, Config
 
 
 class TestConfigManager:

@@ -16,9 +16,9 @@ from typing import Any, Dict, List
 
 import pytest
 
-from src.config import SummarizerConfig
-from src.exceptions import LLMError
-from src.llm_summarizer import LLMSummarizer
+from src.core.config import SummarizerConfig
+from src.core.exceptions import LLMError
+from src.llm.summarizer import LLMSummarizer
 
 
 def test_summarize_invokes_openai_responses_with_ranked_context(
@@ -44,7 +44,7 @@ def test_summarize_invokes_openai_responses_with_ranked_context(
             self.responses = RecordingResponses()
             captured_clients.append(self)
 
-    monkeypatch.setattr("src.llm_summarizer.OpenAI", RecordingOpenAI, raising=True)
+    monkeypatch.setattr("src.llm.summarizer.OpenAI", RecordingOpenAI, raising=True)
 
     config = SummarizerConfig(
         provider="openai",
@@ -120,7 +120,7 @@ def test_summarize_wraps_openai_errors(monkeypatch: pytest.MonkeyPatch) -> None:
         def __init__(self, **_: Any) -> None:
             self.responses = ExplodingResponses()
 
-    monkeypatch.setattr("src.llm_summarizer.OpenAI", ExplodingOpenAI, raising=True)
+    monkeypatch.setattr("src.llm.summarizer.OpenAI", ExplodingOpenAI, raising=True)
 
     config = SummarizerConfig(
         provider="openai",
@@ -169,7 +169,7 @@ def test_summarize_returns_information_insufficient_when_contexts_empty(
         def __init__(self, **_: Any) -> None:
             self.responses = SpyResponses()
 
-    monkeypatch.setattr("src.llm_summarizer.OpenAI", SpyOpenAI, raising=True)
+    monkeypatch.setattr("src.llm.summarizer.OpenAI", SpyOpenAI, raising=True)
 
     config = SummarizerConfig(
         provider="openai",

@@ -1,1 +1,7 @@
-"""Language model integration module for RAG MCP server."""
+"""LLM functionality for summarization and text processing."""
+
+from .summarizer import LLMSummarizer
+
+__all__ = [
+    "LLMSummarizer"
+]

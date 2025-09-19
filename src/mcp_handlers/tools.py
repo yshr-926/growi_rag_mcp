@@ -22,9 +22,9 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.config import ConfigManager
-from src.embedding_model import PlamoEmbeddingModel
-from src.vector_store import ChromaVectorStore
+from src.core.config import ConfigManager
+from src.embedding.model import PlamoEmbeddingModel
+from src.embedding.store import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
 

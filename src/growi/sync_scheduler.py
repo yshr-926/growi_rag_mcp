@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Union
 from contextlib import contextmanager
 
-from src.logging_config import get_logger
+from src.core.logging_config import get_logger
 
 # Default configuration constants
 DEFAULT_INTERVAL_HOURS = 12

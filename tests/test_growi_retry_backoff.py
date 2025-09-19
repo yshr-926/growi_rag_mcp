@@ -200,12 +200,12 @@ class TestGROWIClientRetryBackoff:
         """
         base_url, recorder = server_503_then_ok
         # Deferred import so test fails red if client is missing
-        from src.growi_client import GROWIClient  # noqa: WPS433
+        from src.growi.client import GROWIClient  # noqa: WPS433
 
         slept: list[float] = []
 
         # Patch only the client's time.sleep to avoid interfering with server sleeps
-        import src.growi_client as gc  # type: ignore
+        import src.growi.client as gc  # type: ignore
         monkeypatch.setattr(gc.time, "sleep", lambda s: slept.append(s))
 
         client = GROWIClient(base_url=base_url, token="t")
@@ -223,8 +223,8 @@ class TestGROWIClientRetryBackoff:
         Expect: after ReadTimeout, sleep 1s then 2s, then succeed on third try.
         """
         base_url, recorder = server_timeout_then_ok
-        from src.growi_client import GROWIClient  # noqa: WPS433
-        import src.growi_client as gc  # type: ignore
+        from src.growi.client import GROWIClient  # noqa: WPS433
+        import src.growi.client as gc  # type: ignore
 
         # Speed up tests: make client timeout tiny
         monkeypatch.setattr(gc, "DEFAULT_TIMEOUT_SEC", 0.02)
@@ -253,9 +253,9 @@ class TestGROWIClientRetryBackoff:
         Expect: raises GROWIAPIError with details.retry_attempts and details.backoff_seconds
         """
         base_url, _recorder = server_always_503
-        from src.growi_client import GROWIClient  # noqa: WPS433
-        from src.exceptions import GROWIAPIError  # noqa: WPS433
-        import src.growi_client as gc  # type: ignore
+        from src.growi.client import GROWIClient  # noqa: WPS433
+        from src.core.exceptions import GROWIAPIError  # noqa: WPS433
+        import src.growi.client as gc  # type: ignore
 
         slept: list[float] = []
         monkeypatch.setattr(gc.time, "sleep", lambda s: slept.append(s))
@@ -277,8 +277,8 @@ class TestGROWIClientRetryBackoff:
         Expect: zero sleeps and single request
         """
         base_url, recorder = server_ok
-        from src.growi_client import GROWIClient  # noqa: WPS433
-        import src.growi_client as gc  # type: ignore
+        from src.growi.client import GROWIClient  # noqa: WPS433
+        import src.growi.client as gc  # type: ignore
 
         slept: list[float] = []
         monkeypatch.setattr(gc.time, "sleep", lambda s: slept.append(s))
@@ -296,9 +296,9 @@ class TestGROWIClientRetryBackoff:
         Expect: raises once without sleeping and without alternate attempts
         """
         base_url, recorder = server_404
-        from src.growi_client import GROWIClient  # noqa: WPS433
-        from src.exceptions import GROWIAPIError  # noqa: WPS433
-        import src.growi_client as gc  # type: ignore
+        from src.growi.client import GROWIClient  # noqa: WPS433
+        from src.core.exceptions import GROWIAPIError  # noqa: WPS433
+        import src.growi.client as gc  # type: ignore
 
         slept: list[float] = []
         monkeypatch.setattr(gc.time, "sleep", lambda s: slept.append(s))

@@ -22,8 +22,8 @@ if src_path not in sys.path:
     sys.path.append(src_path)
 
 from fastmcp import FastMCP
-from src.config import ConfigManager
-from src.logging_config import setup_logging, get_logger, LogLevel
+from src.core.config import ConfigManager
+from src.core.logging_config import setup_logging, get_logger, LogLevel
 from src.mcp_handlers.tools import (
     handle_growi_rag_search,
     handle_growi_retrieve

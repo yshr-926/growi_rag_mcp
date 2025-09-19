@@ -112,7 +112,7 @@ class TestVectorSimilaritySearch:
         # Deferred import to ensure RED if module is missing/incomplete
         # The implementation must provide `search` accepting `store=...`
         # and delegate vector ops to the given store (Chroma in production).
-        from src.vector_search import search
+        from src.search.vector_search import search
 
         store = _FakeVectorStore()
         # Construct a tiny corpus; vectors intentionally easy to reason about.
@@ -163,7 +163,7 @@ class TestVectorSimilaritySearch:
         When: page path filter (prefix) is applied,
         Then: results are limited to matching page paths only.
         """
-        from src.vector_search import search
+        from src.search.vector_search import search
 
         store = _FakeVectorStore()
         store.add(

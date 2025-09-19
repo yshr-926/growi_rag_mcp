@@ -30,7 +30,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
-from src.logging_config import get_logger, PerformanceLogger
+from src.core.logging_config import get_logger, PerformanceLogger
 
 # Health status constants
 HEALTH_STATUS_HEALTHY = "healthy"
@@ -438,12 +438,12 @@ class HealthService:
         Returns:
             Dict containing content type and metrics body
         """
-        from src.metrics import MetricsCollector
+        from src.monitoring.metrics import MetricsCollector
 
         metrics_collector = MetricsCollector()
         metrics_body = metrics_collector.get_prometheus_metrics()
 
-        from src.metrics import PROMETHEUS_CONTENT_TYPE
+        from src.monitoring.metrics import PROMETHEUS_CONTENT_TYPE
 
         return {
             "content_type": PROMETHEUS_CONTENT_TYPE,

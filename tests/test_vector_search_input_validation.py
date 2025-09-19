@@ -8,7 +8,7 @@ class _NoSearchStore:
 
 
 def test_requires_store_with_search_by_embedding() -> None:
-    from src.vector_search import search
+    from src.search.vector_search import search
 
     with pytest.raises(ValueError):
         search(query_embedding=[1.0], store=None)  # type: ignore[arg-type]
@@ -18,7 +18,7 @@ def test_requires_store_with_search_by_embedding() -> None:
 
 
 def test_rejects_empty_or_non_numeric_embedding() -> None:
-    from src.vector_search import search
+    from src.search.vector_search import search
 
     class _Store:
         def search_by_embedding(self, *args, **kwargs):  # pragma: no cover
@@ -32,7 +32,7 @@ def test_rejects_empty_or_non_numeric_embedding() -> None:
 
 
 def test_validates_top_k_and_min_relevance() -> None:
-    from src.vector_search import search
+    from src.search.vector_search import search
 
     class _Store:
         def search_by_embedding(self, *args, **kwargs):  # pragma: no cover

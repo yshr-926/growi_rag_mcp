@@ -22,8 +22,8 @@ import time
 
 import requests
 
-from src.exceptions import AuthenticationError, GROWIAPIError
-from src.logging_config import get_logger
+from src.core.exceptions import AuthenticationError, GROWIAPIError
+from src.core.logging_config import get_logger
 
 DEFAULT_TIMEOUT_SEC = 10
 _PAGE_SIZE_MAX = 100  # per GROWI v3 spec

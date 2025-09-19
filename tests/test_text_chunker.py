@@ -36,7 +36,7 @@ class TestMarkdownTextChunking:
         Then content is split into semantic chunks preserving markdown structure.
         """
         # Deferred import so the test fails RED if the implementation is missing/incomplete
-        from src.text_chunker import chunk_markdown  # type: ignore
+        from src.search.text_chunker import chunk_markdown  # type: ignore
 
         md = "\n".join(
             [
@@ -116,7 +116,7 @@ class TestMarkdownTextChunking:
         When chunking is applied,
         Then chunks stay within the limit while maintaining contextual coherence.
         """
-        from src.text_chunker import chunk_markdown  # type: ignore
+        from src.search.text_chunker import chunk_markdown  # type: ignore
 
         # Build a large section so that multiple chunks are required.
         # Keep content predictable: repeated "Step N" ensures increasing order and easy scanning.
