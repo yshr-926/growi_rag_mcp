@@ -64,14 +64,14 @@ class GROWIClient:
         self.base_url: str = base_url.rstrip("/")
         self.token: str = token
         self._session: requests.Session = requests.Session()
-        # Set static auth header on the session for all requests
-        self._session.headers.update(self._auth_headers())
+        # Note: Using URL parameter authentication instead of Bearer header
+        # as this works with the current GROWI instance configuration
         # Reuse module logger; instance keeps no logger state
         self._logger: logging.Logger = _LOGGER
 
-    def _auth_headers(self) -> Dict[str, str]:
-        """Build Authorization header for Bearer token."""
-        return {"Authorization": f"Bearer {self.token}"}
+    def _auth_params(self) -> Dict[str, str]:
+        """Build authentication parameters for URL."""
+        return {"access_token": self.token}
 
     def _build_url(self, path: str) -> str:
         """Construct absolute URL from base and path.
@@ -81,14 +81,14 @@ class GROWIClient:
         return f"{self.base_url}{path if path.startswith('/') else '/' + path}"
 
     def _build_v3_path(self, path: str) -> str:
-        """Return path under /api/v3 unless already under /api/*.
+        """Return path under /_api/v3 unless already under /_api/*.
 
-        Keeps explicit `/api/...` paths untouched to allow tests/compat
-        against simplified endpoints.
+        Uses GROWI's actual API path structure (/_api/v3/...).
+        Keeps explicit `/_api/...` paths untouched to allow tests/compat.
         """
-        if path.startswith("/api/"):
+        if path.startswith("/_api/"):
             return path
-        return "/api/v3" + (path if path.startswith("/") else f"/{path}")
+        return "/_api/v3" + (path if path.startswith("/") else f"/{path}")
 
     def get(self, path: str) -> Dict[str, Any]:
         """Perform an authenticated GET request and return JSON.
@@ -193,7 +193,7 @@ class GROWIClient:
             start = time.perf_counter()
             try:
                 self._logger.debug("HTTP GET start", extra={"url": url, "attempt": attempt + 1})
-                resp = self._session.get(url, timeout=DEFAULT_TIMEOUT_SEC)
+                resp = self._session.get(url, params=self._auth_params(), timeout=DEFAULT_TIMEOUT_SEC)
             except (requests.Timeout, requests.ReadTimeout) as exc:
                 duration_ms = int((time.perf_counter() - start) * 1000)
                 if attempt < len(RETRY_BACKOFFS):
@@ -265,6 +265,85 @@ class GROWIClient:
         )
 
     # --- Pages API helpers -------------------------------------------------
+    def get_page_details(self, page_id: str) -> Dict[str, Any]:
+        """Fetch detailed information for a specific page including full body content.
+
+        Parameters
+        ----------
+        page_id: str
+            The page ID to fetch details for
+
+        Returns
+        -------
+        Dict[str, Any]
+            Detailed page information including full body content
+        """
+        path = f"/page?pageId={page_id}"
+        data = self.get(path)
+
+        if not isinstance(data, dict):
+            raise GROWIAPIError(
+                message="Invalid response payload from GROWI API",
+                endpoint=self._build_url("/_api/v3/page"),
+                status_code=0,
+            )
+
+        # Extract page from response
+        page_data = data.get("page")
+        if not page_data:
+            raise GROWIAPIError(
+                message=f"No page data found for page ID {page_id}",
+                endpoint=self._build_url("/_api/v3/page"),
+                status_code=0,
+            )
+
+        return self._normalize_page(page_data)
+
+    def fetch_pages_with_content(self, limit: int = 1000, updated_since: datetime | None = None) -> List[Dict[str, Any]]:
+        """Fetch public GROWI pages with full body content.
+
+        This method first fetches page metadata using fetch_pages(), then retrieves
+        the full content for each page using get_page_details().
+
+        Parameters
+        ----------
+        limit: int
+            Maximum number of public pages to return (default: 1000 during dev).
+        updated_since: datetime | None
+            When provided, only pages strictly newer than this UTC timestamp are returned.
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Normalized page objects with full body content
+        """
+        # First get the page list
+        pages = self.fetch_pages(limit, updated_since)
+
+        # Then fetch full content for each page
+        pages_with_content = []
+        for page in pages:
+            page_id = page.get('id')
+            if page_id:
+                try:
+                    full_page = self.get_page_details(page_id)
+                    pages_with_content.append(full_page)
+                except Exception as e:
+                    self._logger.warning(
+                        f"Failed to fetch content for page {page_id}: {e}",
+                        extra={"page_id": page_id, "error": str(e)}
+                    )
+                    # Include the original page data without full content
+                    pages_with_content.append(page)
+            else:
+                pages_with_content.append(page)
+
+        self._logger.info(
+            "Completed fetch_pages_with_content",
+            extra={"returned": len(pages_with_content), "requested_limit": limit},
+        )
+        return pages_with_content
+
     def fetch_pages(self, limit: int = 1000, updated_since: datetime | None = None) -> List[Dict[str, Any]]:
         """Fetch public GROWI pages with client-side pagination.
 
@@ -307,7 +386,7 @@ class GROWIClient:
             if not isinstance(data, dict):
                 raise GROWIAPIError(
                     message="Invalid response payload from GROWI API",
-                    endpoint=self._build_url("/api/v3/pages"),
+                    endpoint=self._build_url("/_api/v3/pages/list"),
                     status_code=0,
                 )
 
@@ -350,9 +429,9 @@ class GROWIClient:
 
     # --- Internal helpers (do not change external interface) --------------
     def _build_pages_path(self, limit: int, offset: int) -> str:
-        """Build query path for pages endpoint with standard expansion."""
-        # Request tag and created user expansions so downstream callers can use extra metadata
-        return f"/pages?limit={limit}&offset={offset}&expand={_DEFAULT_EXPAND_PARAMS}"
+        """Build query path for pages/list endpoint."""
+        # Use pages/list endpoint which is confirmed to work with GROWI
+        return f"/pages/list?limit={limit}&offset={offset}"
 
     def _is_public_page(self, page: Dict[str, Any]) -> bool:
         """Return True if the page is public (grant == 1)."""
@@ -363,15 +442,38 @@ class GROWIClient:
         rev = page.get("revision") or {}
         tags = page.get("tags")
         created_user = page.get("createdUser")
+
+        # Handle revision field - it can be a dict or a string (revision ID)
+        # Also extract body content from revision.body if available
+        body_content = page.get("body")  # Try page-level body first
+
+        if isinstance(rev, dict):
+            revision = {
+                "id": rev.get("_id") or rev.get("id"),
+                "updatedAt": rev.get("updatedAt"),
+            }
+            # If page-level body is empty, try revision.body
+            if not body_content:
+                body_content = rev.get("body")
+        elif isinstance(rev, str):
+            # If revision is just a string ID, create minimal revision object
+            revision = {
+                "id": rev,
+                "updatedAt": page.get("updatedAt"),  # Fall back to page-level updatedAt
+            }
+        else:
+            # Handle missing revision
+            revision = {
+                "id": None,
+                "updatedAt": page.get("updatedAt"),
+            }
+
         return {
             "id": page.get("_id") or page.get("id"),
             "title": page.get("title"),
             "path": page.get("path"),
-            "body": page.get("body"),
-            "revision": {
-                "id": rev.get("_id") or rev.get("id"),
-                "updatedAt": rev.get("updatedAt"),
-            },
+            "body": body_content,
+            "revision": revision,
             # Keep grant in output for clarity; tests accept its presence (== 1)
             "grant": page.get("grant"),
             "tags": tags if isinstance(tags, list) else [],
