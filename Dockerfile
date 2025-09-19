@@ -13,19 +13,19 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
+        procps \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Copy uv from builder stage
-COPY --from=uv /uv /uv
-ENV PATH="/uv:$PATH"
+COPY --from=uv /uv /usr/local/bin/uv
 
 # Set working directory
 WORKDIR /app
 
 # Copy dependency files and install dependencies (cached layer)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --system
+RUN uv sync --frozen --no-dev
 
 # Copy application source code
 COPY src/ ./src/
@@ -41,12 +41,12 @@ RUN mkdir -p /app/chroma_db && \
 # Switch to non-root user for security
 USER appuser
 
-# Health check for container orchestration
+# Health check for container orchestration (MCP is STDIO-based)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000/healthz || exit 1
+    CMD pgrep -f "python.*src/main.py" || exit 1
 
 # Expose MCP server port
 EXPOSE 3000
 
 # Start the MCP server
-CMD ["python", "-m", "src.main"]
+CMD ["python", "src/main.py"]

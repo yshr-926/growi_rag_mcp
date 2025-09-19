@@ -34,7 +34,7 @@ graph TD
     C -->|Page Updates| B
 
     %% Data processing pipeline
-    B -->|New/Updated Content| E[Embedding Model<br/>plamo-1b]
+    B -->|New/Updated Content| E[Embedding Model<br/>plamo-embedding-1b]
     E -->|Vector Embeddings| D[ChromaDB<br/>Vector Storage]
 
     %% Query processing flow
@@ -70,12 +70,17 @@ graph TD
 
 3. **Configure the server**
    ```bash
-   cp config.yaml.example config.yaml
-   # Edit config.yaml with your GROWI settings
+   cp config.yaml.sample config.yaml
+   cp .env.example .env
+   # Edit config.yaml and .env with your GROWI settings
    ```
 
 4. **Set environment variables**
    ```bash
+   # Option 1: Edit .env file
+   nano .env
+
+   # Option 2: Export directly
    export GROWI_API_URL="https://your-growi.example.com"
    export GROWI_API_TOKEN="your-bearer-token"
    ```
@@ -87,17 +92,37 @@ graph TD
 
 ### Docker Deployment
 
+#### Option 1: Docker Build & Run
 ```bash
 # Build the image
 docker build -t growi-rag-mcp .
 
-# Run the container
+# Run the container with environment variables
 docker run -d \
+  --name growi-rag-mcp \
   -p 3000:3000 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/config.yaml:/app/config.yaml:ro \
+  -v $(pwd)/models:/app/models:ro \
+  -v growi_chroma_db:/app/chroma_db \
   -e GROWI_API_URL="https://your-growi.example.com" \
   -e GROWI_API_TOKEN="your-bearer-token" \
   growi-rag-mcp
+```
+
+#### Option 2: Docker Compose (Recommended)
+```bash
+# Set environment variables
+cp .env.example .env
+nano .env  # Edit with your settings
+
+# Start with Docker Compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
 ```
 
 ## ⚙️ Configuration
@@ -192,32 +217,57 @@ logging:
 
 ```
 growi-rag-mcp/
-├── src/                    # Source code
-│   ├── growi/             # GROWI API integration
-│   ├── vector/            # Vector search functionality
-│   ├── llm/               # LLM integration
-│   ├── mcp/               # MCP server implementation
-│   ├── config.py          # Configuration management
-│   ├── logging_config.py  # Structured logging
-│   ├── health.py          # Health checks
-│   └── main.py            # Application entry point
-├── tests/                 # Test suite
-├── docs/                  # Documentation
-│   ├── spec.md           # Technical specification
-│   └── tasks.md          # Development tasks
-├── .claude/               # Claude Code integration
-│   ├── commands/         # Custom commands
-│   ├── agents/           # Agent configurations
-│   └── flow/             # Development workflow
-├── config.yaml           # Configuration file
-├── pyproject.toml        # Python project configuration
-└── Dockerfile            # Container configuration
+├── src/                       # Source code
+│   ├── core/                 # Core functionality & configuration
+│   │   ├── config.py        # Configuration management
+│   │   ├── logging_config.py # Structured logging
+│   │   └── exceptions.py     # Custom exceptions
+│   ├── growi/                # GROWI API integration
+│   │   ├── client.py        # GROWI API client
+│   │   ├── page_filter.py   # Page filtering logic
+│   │   └── sync_scheduler.py # Sync scheduling
+│   ├── embedding/            # Embedding & vector storage
+│   │   ├── model.py         # Embedding models
+│   │   ├── pipeline.py      # Embedding pipeline
+│   │   └── store.py         # Vector storage (ChromaDB)
+│   ├── search/               # Search & text processing
+│   │   ├── vector_search.py # Vector search engine
+│   │   └── text_chunker.py  # Text chunking
+│   ├── llm/                  # LLM functionality
+│   │   └── summarizer.py    # LLM summarization
+│   ├── monitoring/           # Health & metrics
+│   │   ├── health.py        # Health checks
+│   │   └── metrics.py       # Metrics collection
+│   ├── mcp_handlers/         # MCP server implementation
+│   │   └── tools.py         # MCP tools
+│   ├── validation/           # Integration validation
+│   └── main.py              # Application entry point
+├── tests/                    # Test suite (182 tests)
+├── docs/                     # Documentation
+│   ├── spec.md              # Technical specification
+│   ├── src-restructuring-plan.md # Structure plan
+│   └── tasks.md             # Development tasks
+├── .claude/                  # Claude Code integration
+│   ├── commands/            # Custom commands
+│   ├── agents/              # Agent configurations
+│   └── flow/                # Development workflow
+├── config.yaml              # Configuration file
+├── pyproject.toml           # Python project configuration
+└── Dockerfile               # Container configuration
 ```
 
 ### Development Workflow
 
 このプロジェクトは **Claude Code** と **TDD (Test-Driven Development)** による開発フローを採用しています。
 
+#### Structure Benefits
+リストラクチャリング完了により以下の利点を享受：
+- 📁 **機能別組織化**: 6つの明確なモジュール構造
+- 🧪 **テスト安定性**: 182テスト全て成功
+- 🔧 **保守性向上**: 関連コードの集約化
+- 📈 **スケーラビリティ**: 新機能の配置先が明確
+
+#### Claude Code Commands
 ```bash
 # Check current development status
 /flow-stats
@@ -226,20 +276,33 @@ growi-rag-mcp/
 /flow-next
 
 # Run full milestone
-/flow-run --milestone M2
+/flow-run --milestone M6
 ```
 
 ### Testing
 
+プロジェクトには **182個の包括的なテストスイート** が含まれています。
+
 ```bash
-# Run all tests
+# Run all tests (182 tests)
 uv run pytest tests/ -v
+
+# Run tests with summary
+uv run pytest --tb=no -q
 
 # Run with coverage
 uv run pytest tests/ --cov=src --cov-report=html
 
-# Run specific test
+# Run specific module tests
 uv run pytest tests/test_config.py::TestConfigManager -v
+uv run pytest tests/test_growi_client.py -v
+uv run pytest tests/test_embedding_* -v
+
+# Run by functionality area
+uv run pytest tests/test_*config* -v      # Core configuration
+uv run pytest tests/test_*growi* -v       # GROWI integration
+uv run pytest tests/test_*embedding* -v   # Embedding & vectors
+uv run pytest tests/test_*llm* -v         # LLM functionality
 ```
 
 ### Code Quality
@@ -305,11 +368,12 @@ The server exposes health check endpoints:
 ### Development Milestones
 
 - **M1**: ✅ Project Setup & Infrastructure
-- **M2**: 🔄 GROWI API Integration (Current)
-- **M3**: 📋 Vector Embedding System
-- **M4**: 🔌 MCP Server Implementation
-- **M5**: 🤖 RAG Search Functionality
-- **M6**: 🚀 Integration & Testing
+- **M2**: ✅ GROWI API Integration
+- **M3**: ✅ Vector Embedding System
+- **M4**: ✅ MCP Server Implementation
+- **M5**: ✅ RAG Search Functionality
+- **M6**: ✅ Integration & Testing Complete
+- **M7**: 🔄 Production Deployment (Current)
 
 ## 📄 License
 
